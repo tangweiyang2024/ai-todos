@@ -25686,6 +25686,31 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default2 = {
+  "workspace.more": "Show {{count}} more sessions",
+  "workspace.attention": "Needs your attention",
+  "workspace.running": "Running",
+  "workspace.confirmed": "Confirmed",
+  "workspace.sessionCount": "{{count}} sessions",
+  "workspace.hook": "Codex live event",
+  "workspace.hostSource": "Codex host status",
+  "workspace.historySource": "Historical observation",
+  "workspace.viewHistory": "View history",
+  "workspace.empty": "No matching sessions",
+  "workspace.list": "List",
+  "workspace.subtitle": "Handle what needs you, then check running sessions",
+  "workspace.label": "Workspace",
+  "workspace.projects": "Projects",
+  "workspace.history": "Session history",
+  "workspace.allProjects": "All projects",
+  "activity.unknownHint": "The session state is unknown. Open it to check.",
+  "activity.sessions": "Sessions",
+  "activity.title": "Activity",
+  "activity.pending": "Awaiting confirmation",
+  "activity.confirmed": "Confirmed complete",
+  "activity.hint": "Observed state changes and human confirmations. Unrecorded history is not reconstructed.",
+  "activity.empty": "No session activity yet",
+  "activity.more": "Show {{count}} more",
+  "card.lastActivity": "Last activity: {{at}}",
   "task.nextComplete": "If this task is done, confirm completion to move it to Completed.",
   "task.startWork": "Start in Codex",
   "task.nextStart": "Open a Codex chat to start this task.",
@@ -25701,7 +25726,7 @@ var en_default2 = {
   "time.todaySelected": "Today, {{date}}, selected",
   "app.title": "Todos \xB7 Workspace",
   "nav.today": "Home",
-  "nav.work": "Tasks",
+  "nav.work": "Sessions",
   "nav.projects": "Projects",
   "nav.okr": "OKRs",
   "nav.inbox": "Inbox",
@@ -25913,7 +25938,7 @@ var en_default2 = {
   "time.selectDate": "Select date",
   "time.selectDateTime": "Select date and time",
   "time.clear": "Clear",
-  "timeline.mode": "Timeline",
+  "timeline.mode": "Activity",
   "timeline.window": "Scheduled: {{count, number}} tasks",
   "timeline.window_one": "Scheduled: {{count, number}} task",
   "timeline.window_other": "Scheduled: {{count, number}} tasks",
@@ -26276,6 +26301,31 @@ var en_default2 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "workspace.more": "\u518D\u663E\u793A {{count}} \u4E2A\u4F1A\u8BDD",
+  "workspace.attention": "\u9700\u8981\u4F60\u5904\u7406",
+  "workspace.running": "\u6B63\u5728\u8FD0\u884C",
+  "workspace.confirmed": "\u5DF2\u786E\u8BA4",
+  "workspace.sessionCount": "{{count}} \u4E2A\u4F1A\u8BDD",
+  "workspace.hook": "Codex \u5B9E\u65F6\u4E8B\u4EF6",
+  "workspace.hostSource": "Codex \u5BBF\u4E3B\u72B6\u6001",
+  "workspace.historySource": "\u5386\u53F2\u89C2\u5BDF",
+  "workspace.viewHistory": "\u67E5\u770B\u8BB0\u5F55",
+  "workspace.empty": "\u6CA1\u6709\u5339\u914D\u7684\u4F1A\u8BDD",
+  "workspace.list": "\u5217\u8868",
+  "workspace.subtitle": "\u5148\u5904\u7406\u9700\u8981\u4F60\u7684\u4E8B\uFF0C\u518D\u5173\u6CE8\u6B63\u5728\u8FD0\u884C\u7684\u4F1A\u8BDD",
+  "workspace.label": "\u5DE5\u4F5C\u7A7A\u95F4",
+  "workspace.projects": "\u9879\u76EE",
+  "workspace.history": "\u4F1A\u8BDD\u8BB0\u5F55",
+  "workspace.allProjects": "\u5168\u90E8\u9879\u76EE",
+  "activity.unknownHint": "\u4F1A\u8BDD\u72B6\u6001\u6682\u4E0D\u53EF\u786E\u8BA4\uFF0C\u8BF7\u6253\u5F00\u4F1A\u8BDD\u67E5\u770B\u3002",
+  "activity.sessions": "\u4F1A\u8BDD",
+  "activity.title": "\u4F1A\u8BDD\u8BB0\u5F55",
+  "activity.pending": "\u5F85\u786E\u8BA4\u5B8C\u6210",
+  "activity.confirmed": "\u4EBA\u5DE5\u786E\u8BA4\u5B8C\u6210",
+  "activity.hint": "\u8BB0\u5F55\u5DF2\u89C2\u5BDF\u5230\u7684\u72B6\u6001\u53D8\u5316\u548C\u4EBA\u5DE5\u786E\u8BA4\uFF1B\u672A\u8BB0\u5F55\u7684\u5386\u53F2\u4E0D\u4F1A\u8865\u9020\u3002",
+  "activity.empty": "\u6682\u65E0\u4F1A\u8BDD\u6D3B\u52A8\u8BB0\u5F55",
+  "activity.more": "\u518D\u663E\u793A {{count}} \u6761",
+  "card.lastActivity": "\u6700\u8FD1\u6D3B\u52A8\uFF1A{{at}}",
   "task.nextComplete": "\u5982\u679C\u8FD9\u9879\u4EFB\u52A1\u5DF2\u7ECF\u505A\u5B8C\uFF0C\u70B9\u51FB\u201C\u786E\u8BA4\u5B8C\u6210\u201D\u79FB\u5230\u5DF2\u5B8C\u6210\u3002",
   "task.startWork": "\u5728 Codex \u5F00\u59CB",
   "task.nextStart": "\u6253\u5F00 Codex \u4F1A\u8BDD\uFF0C\u5F00\u59CB\u5904\u7406\u8FD9\u9879\u4EFB\u52A1\u3002",
@@ -26291,7 +26341,7 @@ var zh_CN_default2 = {
   "time.todaySelected": "\u4ECA\u5929\uFF0C{{date}}\uFF0C\u5DF2\u9009\u4E2D",
   "app.title": "\u4EFB\u52A1 \xB7 \u5DE5\u4F5C\u53F0",
   "nav.today": "\u9996\u9875",
-  "nav.work": "\u4EFB\u52A1",
+  "nav.work": "\u4F1A\u8BDD",
   "nav.projects": "\u9879\u76EE",
   "nav.okr": "OKR",
   "nav.inbox": "\u6536\u4EF6\u7BB1",
@@ -26497,7 +26547,7 @@ var zh_CN_default2 = {
   "time.selectDate": "\u9009\u62E9\u65E5\u671F",
   "time.selectDateTime": "\u9009\u62E9\u65E5\u671F\u548C\u65F6\u95F4",
   "time.clear": "\u6E05\u9664",
-  "timeline.mode": "\u65F6\u95F4\u7EBF",
+  "timeline.mode": "\u4F1A\u8BDD\u8BB0\u5F55",
   "timeline.window": "\u8BA1\u5212\u7A97\u53E3\uFF1A{{count, number}} \u9879",
   "timeline.window_other": "\u8BA1\u5212\u7A97\u53E3\uFF1A{{count, number}} \u9879",
   "timeline.backward": "\u4E0A\u4E00\u6BB5",
@@ -26954,6 +27004,15 @@ function requireThat(condition, code, status = 400, params = {}) {
 function elapsed(focus, now = Date.now()) {
   return focus.elapsedMs + (focus.startedAt ? Math.max(0, now - Date.parse(focus.startedAt)) : 0);
 }
+function preserveConfirmation(session) {
+  if (!session.confirmedAt || session.confirmationHistory?.some((entry) => entry.at === session.confirmedAt)) return session;
+  return { ...session, confirmationHistory: [...session.confirmationHistory ?? [], { at: session.confirmedAt, observedAt: session.observedAt, event: session.event, turnId: session.turnId ?? null, catalogUpdatedAt: session.catalogUpdatedAt ?? null }] };
+}
+function recordSessionActivity(session, previous, state, at, event, turnId) {
+  const oldState = previous ? runtimeState(previous.observedState) : null;
+  if (state !== "confirmed" && state === oldState && (turnId ?? null) === (previous?.turnId ?? null)) return;
+  session.activityHistory = [...session.activityHistory ?? [], { at, state, event, turnId: turnId ?? null }];
+}
 var Store = class {
   constructor(path, now = () => Date.now()) {
     mkdirSync(dirname(path), { recursive: true, mode: 448 });
@@ -26962,6 +27021,7 @@ var Store = class {
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS entities (kind TEXT NOT NULL, id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, task_id TEXT, at TEXT NOT NULL, body TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS events_task_id ON events(task_id);
       CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, body TEXT NOT NULL);
@@ -27030,8 +27090,19 @@ var Store = class {
   }
   snapshot() {
     const sessions2 = this.sessions();
+    const tasks = this.all("task");
+    const sessionById = new Map(sessions2.map((session) => [session.id, session]));
+    for (const task of tasks) {
+      const session = task.sessionId && sessionById.get(task.sessionId);
+      if (!session || task.state === "cancelled") continue;
+      for (const event of this.taskHistory(task.id)) {
+        if (event.type !== "review" || event.decision !== "accept") continue;
+        const history = session.activityHistory ?? [];
+        if (!history.some((item) => item.state === "confirmed" && item.at === event.at)) session.activityHistory = [...history, { at: event.at, state: "confirmed", event: "task_confirmation", turnId: null }];
+      }
+    }
     return {
-      tasks: this.all("task").map((t2) => {
+      tasks: tasks.map((t2) => {
         const session = sessions2.find((s) => s.id === t2.sessionId);
         return { ...t2, ai: session ? { ...session, mode: t2.state === "defining" ? "planning" : "execution" } : null };
       }),
@@ -27107,7 +27178,7 @@ var Store = class {
     return this.transaction(() => {
       const existing = new Map(this.sessions().map((session) => {
         const { state, ...stored } = session;
-        return [session.id, stored];
+        return [session.id, preserveConfirmation(stored)];
       }));
       const seen = /* @__PURE__ */ new Set();
       let added = 0, updated = 0;
@@ -27123,8 +27194,11 @@ var Store = class {
           Object.assign(session, { observedState: thread.state, observedAt: this.at(), event: "thread/list", source: "codex-app-server", ...observation });
           if (!["idle", "completed"].includes(runtimeState(thread.state)) || observation && observation.turnId !== previous?.turnId) delete session.confirmedAt;
         }
+        if (!retainHook && (thread.state !== "unknown" || observation)) recordSessionActivity(session, previous ?? null, runtimeState(session.observedState), observation?.observedAt ?? thread.updatedAt, session.event, session.turnId);
         if (JSON.stringify(session) === JSON.stringify(previous)) continue;
         this.db.prepare("INSERT OR REPLACE INTO sessions VALUES (?,?)").run(session.id, JSON.stringify(session));
+        if (!retainHook && observation && ["task_started", "UserPromptSubmit"].includes(observation.event)) this.reopenAcceptedTask(session.id, observation.observedAt, observation.turnId, previous?.turnId);
+        else if (!retainHook && !observation && ["running", "queued"].includes(runtimeState(thread.state))) this.reopenAcceptedTask(session.id, thread.updatedAt);
         previous ? updated++ : added++;
       }
       for (const previous of existing.values()) if (complete && previous.catalogVisible !== false && !seen.has(previous.id)) {
@@ -27282,6 +27356,14 @@ var Store = class {
     task.review = { decision: c.decision, reviewer: c.reviewer, note: c.note, at: this.at(), reviewedRevision: c.revision };
     this.save("task", task);
     this.event(task.id, "review", { ...task.review, delivery: task.delivery });
+    if (task.sessionId && c.decision === "accept") {
+      const row = this.db.prepare("SELECT body FROM sessions WHERE id=?").get(task.sessionId);
+      if (row) {
+        const session = JSON.parse(row.body);
+        recordSessionActivity(session, session, "confirmed", task.review.at, "task_confirmation", session.turnId);
+        this.db.prepare("UPDATE sessions SET body=? WHERE id=?").run(JSON.stringify(session), session.id);
+      }
+    }
     return task;
   }
   confirmSession(raw) {
@@ -27289,12 +27371,14 @@ var Store = class {
     return this.transaction(() => {
       const row = this.db.prepare("SELECT body FROM sessions WHERE id=?").get(c.id);
       requireThat(row, "errors.sessionMissing", 404);
-      const session = JSON.parse(row.body);
+      let session = preserveConfirmation(JSON.parse(row.body));
       requireThat(session.observedAt === c.observedAt && session.event === c.event && (session.turnId ?? null) === c.turnId && (session.catalogUpdatedAt ?? null) === c.catalogUpdatedAt, "errors.staleSession", 409);
       requireThat(["idle", "completed"].includes(runtimeState(session.observedState)), "errors.confirmState");
       requireThat(!this.all("task").some((task) => task.sessionId === c.id && task.state !== "cancelled"), "errors.taskAcceptance");
       if (!session.confirmedAt) {
         session.confirmedAt = this.at();
+        session = preserveConfirmation(session);
+        recordSessionActivity(session, session, "confirmed", session.confirmedAt, "human_confirmation", session.turnId);
         this.db.prepare("UPDATE sessions SET body=? WHERE id=?").run(JSON.stringify(session), session.id);
       }
       return session;
@@ -27334,16 +27418,30 @@ var Store = class {
     f.revision++;
     return this.setMeta("focus", f);
   }
+  reopenAcceptedTask(sessionId, observedAt, turnId, previousTurnId) {
+    for (const task of this.all("task").filter((task2) => task2.sessionId === sessionId && task2.state === "accepted")) {
+      if (Date.parse(observedAt) <= Date.parse(task.review?.at ?? task.updatedAt) || turnId && turnId === previousTurnId) continue;
+      task.state = "executing";
+      task.revision++;
+      task.updatedAt = observedAt;
+      delete task.review;
+      delete task.delivery;
+      this.save("task", task);
+      this.event(task.id, "session_resumed", { revision: task.revision, state: task.state, sessionId });
+    }
+  }
   observe(raw) {
     const event = external_exports.object({ session_id: id, hook_event_name: external_exports.enum(["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "Interrupt", "SessionEnd"]), cwd: external_exports.string().max(2e3), turn_id: external_exports.string().max(200).optional() }).parse(raw);
     return this.transaction(() => {
       const row = this.db.prepare("SELECT body FROM sessions WHERE id=?").get(event.session_id);
-      const previous = row ? JSON.parse(row.body) : null;
+      const previous = row ? preserveConfirmation(JSON.parse(row.body)) : null;
       if (["Stop", "Interrupt"].includes(event.hook_event_name) && previous?.turnId && event.turn_id && previous.turnId !== event.turn_id) return previous;
       const states = { SessionStart: "idle", UserPromptSubmit: "running", PreToolUse: "running", PostToolUse: "running", PermissionRequest: "waiting_approval", Stop: "idle", Interrupt: "interrupted", SessionEnd: "completed" };
       const session = { ...previous, id: event.session_id, cwd: event.cwd, observedState: states[event.hook_event_name], observedAt: this.at(), event: event.hook_event_name, turnId: event.turn_id ?? previous?.turnId ?? null, source: "codex-hook" };
       if (!["SessionStart", "Stop", "SessionEnd"].includes(event.hook_event_name) || session.turnId !== previous?.turnId) delete session.confirmedAt;
+      recordSessionActivity(session, previous, session.observedState, session.observedAt, session.event, session.turnId);
       this.db.prepare("INSERT OR REPLACE INTO sessions VALUES (?,?)").run(session.id, JSON.stringify(session));
+      if (event.hook_event_name === "UserPromptSubmit") this.reopenAcceptedTask(session.id, session.observedAt, event.turn_id, previous?.turnId);
       return session;
     });
   }
@@ -27704,7 +27802,7 @@ async function codexAction(store2, raw) {
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.20",
+  version: "0.1.21",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",

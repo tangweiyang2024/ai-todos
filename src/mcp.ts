@@ -18,11 +18,15 @@ const result = (value: Record<string, unknown>): CallToolResult => ({ content: [
 const guarded = <T,>(fn: (args: T) => Promise<Record<string, unknown>>) => async (args: T): Promise<CallToolResult> => { try { return result(await fn(args)); } catch (error) { const payload = errorPayload(error); return { isError: true, content: [{ type: 'text', text: String(payload.error) }], structuredContent: payload }; } };
 const openToolConfig = {
   icons,
-  title: '任务', description: 'Open the local ai-todos task, OKR, plan, focus and delivery workspace. If this host cannot render MCP Apps, open browserUrl in its browser.',
+  title: '任务', description: 'Open the local ai-todos session and task workspace. If this host cannot render MCP Apps, open browserUrl in its browser.',
   inputSchema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false },
   _meta: { ui: { resourceUri: uri }, 'openai/ui': { entrypoints: [{ type: 'global' }, { type: 'thread' }] } },
 };
-registerAppTool(server, 'ai_todos_open', openToolConfig, guarded(async () => ({ ...await service('state'), browserUrl: origin })));
+registerAppTool(server, 'ai_todos_open', openToolConfig, guarded(async () => ({ browserUrl: origin })));
+server.registerTool('ai_todos_workspace', { description: 'Read workspace state for the ai-todos interface.', inputSchema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ['app'] } } }, async () => {
+  try { return { content: [{ type: 'text' as const, text: 'Workspace state ready.' }], structuredContent: await service('state') }; }
+  catch (error) { const payload = errorPayload(error); return { isError: true, content: [{ type: 'text' as const, text: String(payload.error) }], structuredContent: payload }; }
+});
 server.registerTool('ai_todos_snapshot', { description: 'Read persistent tasks, inbox captures, projects, OKRs, plans, trusted hook sessions, focus and reminders. Set syncThreads=true to refresh the official existing-session catalog before reading, for binding a host-created conversation. This does not create or execute conversations. Observed AI state is independent of task business state.', inputSchema: z.object({ syncThreads: z.boolean().optional() }), annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ['model', 'app'] } } }, guarded(async (args: { syncThreads?: boolean }) => {
   if (args.syncThreads) await service('codex', { operation: 'sync_threads' });
   return service('state');

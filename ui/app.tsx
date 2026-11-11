@@ -11,9 +11,10 @@ import { createRoot } from 'react-dom/client';
 import { App, applyDocumentTheme, applyHostStyleVariables, applyHostFonts } from '@modelcontextprotocol/ext-apps';
 import { Maximize2, Plus, RefreshCw, Search, Settings } from 'lucide-react';
 import { DatePickerField, SelectField } from './components/FormControls.tsx';
-import { BoardView, ExecutionCard, TimelineView } from './components/ExecutionView.tsx';
+import { BoardView, ExecutionCard } from './components/ExecutionView.tsx';
+import { SessionHistory } from './components/SessionHistory.tsx';
+import { SessionList } from './components/SessionList.tsx';
 import { TaskEditor, EditorDialog, Field, ScheduleFields, Delivery } from './components/TaskEditor.tsx';
-import { GoalsView } from './components/GoalsView.tsx';
 import { TodayView, DailyPlanEditor, dayPlans } from './components/TodayView.tsx';
 import { InboxView } from './components/InboxView.tsx';
 import { clock, dateInput, fmt, hours, labels, localDay, parseSchedule, noticeTitle, number } from './format.ts';
@@ -22,12 +23,13 @@ import { visibleExecutionSessions, executionColumnForSession } from './execution
 import './xinmo.css';
 import './style.css';
 import './refinement.css';
+import './workspace.css';
 
 const localOrigin = '__AI_TODOS_ORIGIN__';
 const embedded = window.parent !== window;
 const bridge = embedded ? new App({ name: 'ai-todos', version: '0.1.10' }, { availableDisplayModes: ['inline', 'fullscreen'] }, { autoResize: false }) : null;
-const mainPages = { today: 'nav.today', work: 'nav.work', projects: 'nav.projects', okr: 'nav.okr' } as const;
-const pages: Record<string, TranslationKey> = { ...mainPages, inbox: 'nav.inbox', plans: 'nav.plans', settings: 'nav.settings' };
+const mainPages = { work: 'nav.work', projects: 'nav.projects' } as const;
+const pages: Record<string, TranslationKey> = { ...mainPages, today: 'nav.today', inbox: 'nav.inbox', plans: 'nav.plans', settings: 'nav.settings' };
 const singular: Record<string, TranslationKey> = { task: 'entity.task', project: 'entity.project', objective: 'entity.objective', keyResult: 'entity.keyResult', plan: 'entity.plan' };
 let csrf: string | undefined;
 interface SyncResult { count: number; added: number; updated: number; transport?: string }
@@ -42,7 +44,7 @@ function api(path: 'session-confirm', data: Omit<Parameters<TaskCallbacks['onCon
 function api(path: string, data: unknown): Promise<unknown>;
 async function api(path: string, data?: unknown): Promise<unknown> {
   if (embedded) {
-    const names: Record<string, string> = { state: 'ai_todos_snapshot', command: 'ai_todos_manage', task: 'ai_todos_task', codex: 'ai_todos_codex', 'session-confirm': 'ai_todos_confirm_session', 'task-complete': 'ai_todos_complete_task' };
+    const names: Record<string, string> = { state: 'ai_todos_workspace', command: 'ai_todos_manage', task: 'ai_todos_task', codex: 'ai_todos_codex', 'session-confirm': 'ai_todos_confirm_session', 'task-complete': 'ai_todos_complete_task' };
     if (!names[path]) throw new Error(i18n.t("connection.localReview"));
     const result = await bridge!.callServerTool({ name: names[path], arguments: (path === 'command' ? { command: data } : path === 'codex' ? { action: data } : (data ?? {})) as Record<string, unknown> });
     if (result.isError) throw new Error(localizedError(result.structuredContent ?? { error: result.content?.find(item => item.type === 'text')?.text }));
@@ -143,7 +145,7 @@ function Workspace() {
   const [connectionError, setConnectionError] = useState('');
   const [hostContext, setHostContext] = useState<ReturnType<App['getHostContext']>>();
   const [threadTransport, setThreadTransport] = useState<string | null>(null);
-  const [view, setView] = useState({ page: 'today', mode: 'board', project: '', search: '' });
+  const [view, setView] = useState({ page: 'work', mode: 'list', project: '', search: '' });
   const [modal, setModal] = useState<Modal | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -240,7 +242,7 @@ function Workspace() {
       // Let an earlier snapshot finish so it cannot overwrite this confirmation.
       if (refreshing.current) await refreshing.current.catch(() => {});
       const current = snapshotRef.current!;
-      const next = { ...current, sessions: current.sessions.map(item => item.id === confirmed.id && item.observedAt === confirmed.observedAt && item.event === confirmed.event && (item.turnId ?? null) === (confirmed.turnId ?? null) && (item.catalogUpdatedAt ?? null) === (confirmed.catalogUpdatedAt ?? null) ? { ...item, confirmedAt: confirmed.confirmedAt } : item) };
+      const next = { ...current, sessions: current.sessions.map(item => item.id === confirmed.id && item.observedAt === confirmed.observedAt && item.event === confirmed.event && (item.turnId ?? null) === (confirmed.turnId ?? null) && (item.catalogUpdatedAt ?? null) === (confirmed.catalogUpdatedAt ?? null) ? { ...item, confirmedAt: confirmed.confirmedAt, confirmationHistory: confirmed.confirmationHistory, activityHistory: confirmed.activityHistory } : item) };
       snapshotRef.current = next; setSnapshot(next);
       if (!silent) toast(t("session.confirmed")); return true;
     } catch (reason) { if (!silent) toast(reason instanceof Error ? reason.message : String(reason)); return false; }
@@ -305,11 +307,13 @@ function Workspace() {
         if (stopped) return;
         const next = await refresh(true); notified = new Set(next.notices.map(notice => notice.id));
         if (stopped) return;
-        try { await api('codex', { operation: 'sync_projects' }); if (!stopped) await refresh(true); }
+        let projectsChanged = false;
+        try { const result = await api('codex', { operation: 'sync_projects' }); projectsChanged = result.added > 0 || result.updated > 0; }
         catch (reason) { if (!stopped) toast(t("project.syncFailed", { value: (reason instanceof Error ? reason.message : String(reason)) })); }
         if (stopped) return;
-        try { await syncThreads(); } catch (reason) { if (!stopped) toast(t("session.syncFailed", { value: (reason instanceof Error ? reason.message : String(reason)) })); }
+        try { await syncThreads(); projectsChanged = false; } catch (reason) { if (!stopped) toast(t("session.syncFailed", { value: (reason instanceof Error ? reason.message : String(reason)) })); }
         if (stopped) return;
+        if (projectsChanged) await refresh(true);
         const id = location.hash.match(/^#task=([a-f0-9-]+)$/)?.[1]; if (id) await openTask(id);
       } catch (reason) { if (!stopped) setConnectionError((reason instanceof Error ? reason.message : String(reason))); }
       if (stopped) return;
@@ -329,14 +333,16 @@ function Workspace() {
   const findTask = (id?: string | null) => snapshot.tasks.find(task => task.id === id);
   const projectName = (id?: string | null) => snapshot.projects.find(project => project.id === id)?.title || t("project.none");
   const filtered = snapshot.tasks.filter(task => (!view.project || task.projectId === view.project) && (!view.search || `${task.title} ${task.description}`.toLowerCase().includes(view.search.toLowerCase())));
-  const filteredSessions = visibleExecutionSessions(snapshot.sessions, snapshot.tasks).filter(session => session.catalogVisible !== false && (!view.project || snapshot.projects.find(project => project.id === view.project)?.codex?.workspacePath === session.cwd) && (!view.search || `${session.title || ''} ${session.preview || ''}`.toLowerCase().includes(view.search.toLowerCase()))).sort((a, b) => (b.catalogUpdatedAt || b.observedAt).localeCompare(a.catalogUpdatedAt || a.observedAt));
+  const sessionMatches = (session: Snapshot['sessions'][number]) => (session.catalogVisible !== false || ['running', 'queued', 'waiting_approval', 'waiting_input'].includes(session.state)) && (!view.project || snapshot.projects.find(project => project.id === view.project)?.codex?.workspacePath === session.cwd) && (!view.search || `${session.title || ''} ${session.preview || ''}`.toLowerCase().includes(view.search.toLowerCase()));
+  const historySessions = snapshot.sessions.filter(sessionMatches);
+  const filteredSessions = visibleExecutionSessions(historySessions, snapshot.tasks).sort((a, b) => (b.catalogUpdatedAt || b.observedAt).localeCompare(a.catalogUpdatedAt || a.observedAt));
   const boardSessionCount = filteredSessions.filter(session => executionColumnForSession(session) !== null).length;
   const elapsedMs = snapshot.focus.totalMs + (snapshot.focus.status === 'running' ? Math.max(0, Date.now() - receivedAt.current) : 0);
   const focusCandidates = snapshot.tasks.filter(task => !['accepted', 'cancelled'].includes(task.state));
   const selectedFocusTask = focusCandidates.find(task => task.id === focusTaskId);
   const totals = view.page === 'today' ? dailyTotals(snapshot) : [], dayRows = totals.filter(row => row.day === statsDate);
   const mainPage = ['inbox', 'plans'].includes(view.page) ? 'today' : view.page;
-  const newKind = ({ work: 'task', projects: 'project', okr: 'objective', plans: 'plan' } as Record<string, Kind>)[view.page];
+  const newKind = ({ work: 'task', projects: 'project', plans: 'plan' } as Record<string, Kind>)[view.page];
   let modalTitle = '', modalDescription = '', modalBody: ReactNode;
   if (modal) {
     const task = modal.task!, entity = modal.entity!;
@@ -373,9 +379,20 @@ function Workspace() {
       modalBody = <div className="editor-details"><p className="note">{t("prompt.identityHint")}</p><textarea aria-label={t("prompt.label")} readOnly value={modal.text} className="execution-prompt" /><div className="actions"><button disabled={busy} onClick={() => run(async () => { try { await navigator.clipboard.writeText(modal.text!); toast(t("prompt.copied")); } catch { document.querySelector<HTMLTextAreaElement>('.execution-prompt')!.select(); toast(t("connection.copyDenied")); } })}>{t("prompt.copy")}</button>{embedded && <button className="primary" disabled={busy} onClick={() => run(async () => { const result = await bridge!.sendMessage({ role: 'user', content: [{ type: 'text', text: modal.text! }] }); if (result.isError) throw new Error(t("connection.sendDenied")); }, t("prompt.sent"), true)}>{t("prompt.send")}</button>}</div></div>;
     }
   }
-  return <><main className={`main ${view.page === 'work' && view.mode === 'board' ? 'is-board' : ''} ${snapshot.focus.status !== 'idle' ? 'has-focus' : ''}`}>
-    <nav className="nav" aria-label={t("nav.label")}>{Object.entries(mainPages).map(([page, label]) => <button key={page} disabled={busy} aria-current={mainPage === page ? 'page' : undefined} className={mainPage === page ? 'active' : ''} onClick={() => setViewValue('page', page)}>{t(label)}</button>)}<button className={`nav-settings ${view.page === 'settings' ? 'active' : ''}`} disabled={busy} aria-current={view.page === 'settings' ? 'page' : undefined} onClick={() => setViewValue('page', 'settings')}><Settings size={16} aria-hidden="true" />{t("nav.settings")}</button></nav>
-    <header className="page-header"><div className="row">{['inbox', 'plans'].includes(view.page) && <><button className="quiet small" disabled={busy} onClick={() => setViewValue('page', 'today')}>{t("nav.today")}</button><span className="muted" aria-hidden="true">/</span></>}<h1>{t(pages[view.page])}</h1></div><div className="row">{hostContext?.availableDisplayModes?.includes('fullscreen') && hostContext.displayMode !== 'fullscreen' && <button className="quiet small" disabled={busy} onClick={fullscreen}><Maximize2 size={14} aria-hidden="true" />{t('connection.fullscreen')}</button>}{view.page === 'today' && <button className="quiet small" disabled={busy} onClick={() => setViewValue('page', 'plans')}>{t("nav.plans")}</button>}{view.page === 'projects' && <button className="quiet small" disabled={busy} onClick={syncProjects}><RefreshCw size={14} />{t("project.sync")}</button>}<button className="quiet small" disabled={busy} onClick={view.page === 'work' ? syncWorkspace : () => run(() => refresh(true))}><RefreshCw size={14} />{t("common.refresh")}</button>{newKind && <button className="primary" disabled={busy} onClick={() => openEntity(newKind)}><Plus size={15} />{t("entity.new", { value: t(singular[newKind]) })}</button>}</div></header>
+  return <><div className="workspace-shell"><aside className="workspace-sidebar">
+    <div className="workspace-brand"><span>a</span> ai-todos</div>
+    <div className="workspace-sidebar__label">{t('workspace.label')}</div>
+    <nav className="workspace-sidebar__nav" aria-label={t('workspace.label')}>
+      <button type="button" className={view.page === 'work' && view.mode !== 'timeline' ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', mode: current.mode === 'timeline' ? 'list' : current.mode }))}><span>◉ &nbsp;{t('nav.work')}</span><small>{filteredSessions.length + filtered.length}</small></button>
+      <button type="button" className={view.page === 'work' && view.mode === 'timeline' ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', mode: 'timeline' }))}><span>◷ &nbsp;{t('workspace.history')}</span></button>
+    </nav>
+    <div className="workspace-sidebar__projects"><div className="workspace-sidebar__label">{t('workspace.projects')}</div><nav className="workspace-sidebar__nav" aria-label={t('workspace.projects')}>
+      <button type="button" className={!view.project ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', project: '' }))}><span>{t('workspace.allProjects')}</span></button>
+      {snapshot.projects.map(project => <button type="button" key={project.id} className={view.project === project.id ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', project: project.id }))}><span>{project.title}</span></button>)}
+    </nav></div>
+    <button type="button" className="workspace-sidebar__settings" onClick={() => setView(current => ({ ...current, page: 'settings' }))}><Settings size={15} />{t('nav.settings')}</button>
+  </aside><main className={`main workspace-main ${view.page === 'work' && view.mode === 'board' ? 'is-board' : ''}`}>
+    <header className="page-header workspace-header"><div><h1>{view.page === 'work' && view.mode === 'timeline' ? t('workspace.history') : t(pages[view.page])}</h1>{view.page === 'work' && <p className="workspace-subtitle">{t(view.mode === 'timeline' ? 'activity.hint' : 'workspace.subtitle')}</p>}</div><div className="row">{hostContext?.availableDisplayModes?.includes('fullscreen') && hostContext.displayMode !== 'fullscreen' && <button className="quiet small" disabled={busy} onClick={fullscreen}><Maximize2 size={14} aria-hidden="true" />{t('connection.fullscreen')}</button>}<button className="quiet small" disabled={busy} onClick={view.page === 'work' ? syncWorkspace : () => run(() => refresh(true))}><RefreshCw size={14} />{t('common.refresh')}</button></div></header>
     {connectionError && <p className="error" role="alert">{t("connection.unavailable")}{connectionError}</p>}
     <TodayView snapshot={snapshot} busy={busy} visible={view.page === 'today'} elapsedMs={elapsedMs} onAdd={addToday} onCapture={captureInbox} onRefine={refineCapture} onCreateTask={createToday} onOpenTask={openTask} onTaskAction={taskAction} onFocusTask={focusTask} onFocusOp={focusOp} onInbox={openInbox} onPlan={() => { const date = localDay(new Date()); open({ type: 'daily_plan', date, plans: dayPlans(snapshot.plans, date) }); }} />
     {view.page === 'today' && <section className="card home-focus" aria-labelledby="focus-stats-title"><div className="row spaced"><h2 id="focus-stats-title">{t("focus.stats")}</h2><DatePickerField label={t("focus.statsDate")} value={statsDate} onValueChange={setStatsDate} /></div><div className="summary"><div><p>{statsDate === localDay(new Date()) ? t("focus.todayTime") : t("focus.dateTime")}</p><div className="number">{hours(dayRows.reduce((sum, row) => sum + row.ms, 0))}</div></div><div><p>{t("focus.totalTime")}</p><div className="number">{hours(totals.reduce((sum, row) => sum + row.ms, 0))}</div></div><div><p>{t("focus.recordCount")}</p><div className="number">{number(snapshot.timeRecords.length)}</div></div></div>
@@ -386,20 +403,22 @@ function Workspace() {
         <p className="note">{t("focus.wallClockHint")}</p>
       </details></section>}
     <InboxView items={snapshot.inbox} visible={view.page === 'inbox'} busy={busy} onClose={() => setViewValue('page', 'today')} onCapture={captureInbox} onRefine={refineCapture} onPromote={promoteInbox} onArchive={(item, archived) => run(() => mutate({ action: 'update', kind: 'inbox', id: item.id, revision: item.revision, data: { archived } }), archived ? t("inbox.archived") : t("inbox.restored"))} />
-    {view.page === 'work' && <section className={`execution-view ${view.mode === 'board' ? 'is-board' : ''}`}><div className="execution-toolbar"><div className="row"><div className="segmented-control">{[['board', t("board.mode")], ['timeline', t("timeline.mode")]].map(([mode, label]) => <button key={mode} className={view.mode === mode ? 'is-active' : ''} aria-pressed={view.mode === mode} onClick={() => setViewValue('mode', mode)}>{label}</button>)}</div><span className="muted">{t("board.summary", { taskCount: t("board.taskCount", { count: filtered.length }), sessionCount: t("board.sessionCount", { count: boardSessionCount }) })}</span></div><div className="execution-filters"><SelectField label={t("entity.project")} value={view.project} onValueChange={value => setViewValue('project', value)} disabled={!snapshot.projects.length} groups={[{ options: [{ value: '', label: t("project.all") }, ...snapshot.projects.map(project => ({ value: project.id, label: project.title }))] }]} /><label className="task-search"><Search size={14} aria-hidden="true" /><input type="search" aria-label={t("board.search")} placeholder={t("board.searchPlaceholder")} value={view.search} onChange={event => setViewValue('search', event.target.value)} /></label></div></div>
-      {threadTransport === 'history' && !snapshot.sessions.some(session => session.source === 'codex-hook') && <p className="note" role="status">{t("connection.hookSetup")}</p>}
-      {view.mode === 'board' ? <BoardView tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} onOpenSession={openSession} onConfirmSession={confirmSession} onReviewTask={review} onCompleteTask={completeTask} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenCodex={openCodex} onTransition={transition} onError={toast} /> : <TimelineView key={JSON.stringify([view.project, view.search])} tasks={filtered} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenSession={openSession} onReviewTask={review} onCompleteTask={completeTask} onOpenCodex={openCodex} onReschedule={reschedule} />}
-      {filtered.some(task => task.state === 'cancelled') && <details><summary className="muted">{t("task.cancelledCount", { count: filtered.filter(task => task.state === 'cancelled').length })}</summary><div className="grid">{filtered.filter(task => task.state === 'cancelled').map(task => <ExecutionCard key={task.id} task={task} projects={snapshot.projects} busy={busy} onOpenTask={openTask} />)}</div></details>}
+    {view.page === 'work' && <section className={`execution-view ${view.mode === 'board' ? 'is-board' : ''}`}>
+      {view.mode !== 'timeline' && <div className="execution-toolbar workspace-toolbar"><div className="segmented-control">{[['list', t('workspace.list')], ['board', t('board.mode')]].map(([mode, label]) => <button key={mode} className={view.mode === mode ? 'is-active' : ''} aria-pressed={view.mode === mode} onClick={() => setViewValue('mode', mode)}>{label}</button>)}</div>
+        <label className="task-search"><Search size={14} aria-hidden="true" /><input type="search" aria-label={t('board.search')} placeholder={t('board.searchPlaceholder')} value={view.search} onChange={event => setViewValue('search', event.target.value)} /></label>
+        <SelectField label={t('entity.project')} value={view.project} onValueChange={value => setViewValue('project', value)} disabled={!snapshot.projects.length} groups={[{ options: [{ value: '', label: t('project.all') }, ...snapshot.projects.map(project => ({ value: project.id, label: project.title }))] }]} />
+      </div>}
+      {threadTransport === 'history' && !snapshot.sessions.some(session => session.source === 'codex-hook') && <p className="note" role="status">{t('connection.hookSetup')}</p>}
+      {view.mode === 'list' ? <SessionList tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenSession={openSession} onConfirmSession={confirmSession} onCompleteTask={completeTask} onReviewTask={review} onOpenCodex={openCodex} onHistory={() => setViewValue('mode', 'timeline')} /> : view.mode === 'board' ? <BoardView tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} onOpenSession={openSession} onConfirmSession={confirmSession} onReviewTask={review} onCompleteTask={completeTask} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenCodex={openCodex} onTransition={transition} onError={toast} /> : <SessionHistory sessions={historySessions} tasks={snapshot.tasks} onOpenSession={openSession} />}
     </section>}
     {view.page === 'projects' && <div className="grid">{snapshot.projects.map(project => {
       const tasks = snapshot.tasks.filter(task => task.projectId === project.id), accepted = tasks.filter(task => task.state === 'accepted').length;
       return <article className="card" key={project.id}><div className="row spaced"><h2>{project.title}</h2><button className="small" disabled={busy} onClick={() => openEntity('project', project)}>{t("common.edit")}</button></div>{project.codex && <p className="project-path">Codex · {project.codex.workspacePath}</p>}<p className="muted">{project.description || t("project.noDescription")}</p><div className="progress-track"><span style={{ width: `${tasks.length ? accepted / tasks.length * 100 : 0}%` }} /></div><div className="row spaced"><span className="muted">{t("project.acceptedCount", { accepted: accepted, count: tasks.length })}</span><button className="small" onClick={() => setView(current => ({ ...current, page: 'work', project: project.id }))}>{t("project.viewTasks")}</button></div></article>;
     })}{!snapshot.projects.length && <div className="empty-state"><strong>{t("project.organize")}</strong><span>{t("project.sharedTasks")}</span></div>}</div>}
-    {view.page === 'okr' && <GoalsView snapshot={snapshot} busy={busy} onEdit={openEntity} onNew={(kind, parent) => openEntity(kind, null, parent)} onOpenTask={openTask} />}
     {view.page === 'plans' && <div className="list"><p className="muted">{t("plan.description")}</p>{[...snapshot.plans].sort((left, right) => right.date.localeCompare(left.date)).map(plan => <article className="card" key={plan.id}><div className="row spaced"><div><span className="muted">{plan.date}</span><h2>{plan.title}</h2></div><button className="small" disabled={busy} onClick={() => openEntity('plan', plan)}>{t("plan.edit")}</button></div><p className="muted">{plan.note}</p><div className="list">{plan.taskIds.map(id => <div className="row spaced" key={id}><button className="quiet" onClick={() => openTask(id)}>{findTask(id)?.title || t("task.deleted")}</button><span className="execution-status">{t(labels[findTask(id)?.state ?? ''] || 'common.unknown')}</span></div>)}{!plan.taskIds.length && <span className="muted">{t("plan.emptyTasks")}</span>}</div></article>)}{!snapshot.plans.length && <div className="empty-state"><strong>{t("plan.emptyTitle")}</strong><span>{t("plan.emptyHint")}</span></div>}</div>}
     {view.page === 'settings' && <div className="grid settings-grid"><section className="card"><h2>{t('settings.language')}</h2><SelectField label={t('settings.language')} value={getLanguagePreference()} disabled={busy} onValueChange={value => { if (!setLanguagePreference(value as LanguagePreference)) toast(t('settings.languageStorageFailed')); }} groups={[{ options: [{ value: 'auto', label: t('settings.followSystem') }, ...Object.entries(languages).map(([value, { name }]) => ({ value, label: name }))] }]} /><p className="note">{t('settings.languageHint')}</p></section><section className="card"><div className="row spaced"><h2>{t("settings.reminders")}</h2><button className="small" disabled={busy} onClick={() => open({ type: 'settings', settings: { ...snapshot.settings } })}>{t("settings.editReminders")}</button></div><p className="muted">{t("settings.reminderLabel")}{snapshot.settings.reminders ? t("common.on") : t("common.off")}<br />{t("settings.followUpLabel")}{snapshot.settings.followUpMinutes ? t("settings.followUpMinutes", { followUpMinutes: snapshot.settings.followUpMinutes, count: snapshot.settings.followUpMinutes }) : t("common.off")}<br />{t("settings.reviewLabel")}{snapshot.settings.reviewTime || t("common.off")}<br />{t("settings.timezoneLabel")}{snapshot.settings.timezone}</p>{!embedded && <button className="small" onClick={() => run(async () => { if (!('Notification' in window)) throw new Error(t("settings.notificationsUnsupported")); const permission = await Notification.requestPermission(); toast(permission === 'granted' ? t("settings.notificationsAllowed") : t("settings.notificationsDenied")); })}>{t("settings.allowNotifications")}</button>}<p className="note">{t("settings.schedulerHint")}</p></section><section className="card"><h2>{t("notices.title")}</h2><p className="muted">{t("notices.unreadCount", { count: snapshot.notices.filter(notice => !notice.read).length })}</p><div className="list">{snapshot.notices.map(notice => <article className={`notice ${notice.read ? 'read' : ''}`} key={notice.id}><div className="row spaced"><h3>{noticeTitle(notice)}</h3>{!notice.read ? <button className="small" disabled={busy} onClick={() => run(() => mutate({ action: 'ack', id: notice.id }))}>{t("notices.read")}</button> : <span className="muted">{t("notices.read")}</span>}</div><p className="muted">{fmt(notice.createdAt)}</p><button className="small" onClick={() => notice.taskId ? openTask(notice.taskId) : setViewValue('page', 'today')}>{notice.taskId ? t("task.open") : t("notices.viewToday")}</button></article>)}{!snapshot.notices.length && <span className="muted">{t("notices.empty")}</span>}</div></section></div>}
-  </main>
-    {snapshot.focus.status !== 'idle' && view.page !== 'today' && <div className="focus-bar"><div><span className="execution-status">{snapshot.focus.status === 'running' ? t("focus.barRunning") : t("focus.barPaused")}</span> <span>{findTask(snapshot.focus.taskId)?.title}</span><strong>{clock(elapsedMs)}</strong></div><div className="row"><button className="small" disabled={busy} onClick={() => focusOp(snapshot.focus.status === 'running' ? 'pause' : 'resume')}>{snapshot.focus.status === 'running' ? t("focus.barPause") : t("focus.barResume")}</button><button className="small" disabled={busy} onClick={() => focusOp('finish')}>{t("focus.end")}</button></div></div>}
+  </main></div>
+
     {modal && <EditorDialog key={modal.key} title={modalTitle} description={modalDescription} busy={busy} error={error} onClose={() => setModal(modal.returnTo || null)}>{modalBody}</EditorDialog>}
     {message && <div className="toast" role="status" aria-live="polite">{message}</div>}
   </>;

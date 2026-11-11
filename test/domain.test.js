@@ -145,14 +145,14 @@ test('hook-observed IDs, unique binding, Xinmo planning projection and Stop neve
   s.observe({ session_id: sessionId, cwd: '/tmp/project', hook_event_name: 'Stop', turn_id: 'turn-1' });
   snapshot = s.snapshot(); projected = snapshot.tasks.find(t => t.id === task.id);
   assert.equal(projected.state, 'defining');
-  assert.equal(executionColumnForTask(projected), 'waiting_user');
+  assert.equal(executionColumnForTask(projected), 'waiting_confirmation');
   assert.equal(taskStatus(projected), '待确认完成');
   assert.deepEqual(visibleExecutionSessions(snapshot.sessions, snapshot.tasks), []);
   assert.equal(snapshot.sessions[0].mode, undefined);
   task = transition(s, task, 'ready');
   projected = s.snapshot().tasks.find(t => t.id === task.id);
   assert.equal(projected.ai.mode, 'execution');
-  assert.equal(executionColumnForTask(projected), 'waiting_user');
+  assert.equal(executionColumnForTask(projected), 'waiting_confirmation');
   s.observe({ session_id: sessionId, cwd: '/tmp/project', hook_event_name: 'UserPromptSubmit', turn_id: 'turn-2' });
   task = transition(s, task, 'executing', 'model');
   assert.equal(s.snapshot().tasks.find(t => t.id === task.id).ai.mode, 'execution');

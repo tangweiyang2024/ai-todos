@@ -9,10 +9,12 @@ export interface EntityMeta { id: string; revision: number; createdAt: string; u
 export type Evidence = Extract<Command, { action: 'submit' }>['evidence'][number];
 export interface Delivery { summary: string; evidence: Evidence[]; submittedAt: string }
 export interface Review { decision: 'accept' | 'reject'; reviewer: string; note: string; at: string; reviewedRevision: number }
+export interface SessionActivity { at: string; state: string; turnId: string | null; event: string }
+export interface SessionConfirmation { at: string; observedAt: string; event: string; turnId: string | null; catalogUpdatedAt: string | null }
 export interface Session {
   id: string; cwd: string; observedState: string; observedAt: string; event: string;
   turnId?: string | null; source: string; title?: string; preview?: string;
-  codexProjectId?: string | null; catalogUpdatedAt?: string; catalogVisible?: boolean; confirmedAt?: string;
+  codexProjectId?: string | null; catalogUpdatedAt?: string; catalogVisible?: boolean; confirmedAt?: string; confirmationHistory?: SessionConfirmation[]; activityHistory?: SessionActivity[];
 }
 export type LiveSession = Session & { state: string; mode?: 'planning' | 'execution' };
 export type Task = EntityData<'task'> & EntityMeta & {

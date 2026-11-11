@@ -74,6 +74,17 @@ export function elapsed(focus: Focus, now = Date.now()) {
   return focus.elapsedMs + (focus.startedAt ? Math.max(0, now - Date.parse(focus.startedAt)) : 0);
 }
 
+function preserveConfirmation(session: Session): Session {
+  if (!session.confirmedAt || session.confirmationHistory?.some(entry => entry.at === session.confirmedAt)) return session;
+  return { ...session, confirmationHistory: [...(session.confirmationHistory ?? []), { at: session.confirmedAt, observedAt: session.observedAt, event: session.event, turnId: session.turnId ?? null, catalogUpdatedAt: session.catalogUpdatedAt ?? null }] };
+}
+
+function recordSessionActivity(session: Session, previous: Session | null, state: string, at: string, event: string, turnId?: string | null) {
+  const oldState = previous ? runtimeState(previous.observedState) : null;
+  if (state !== 'confirmed' && state === oldState && (turnId ?? null) === (previous?.turnId ?? null)) return;
+  session.activityHistory = [...(session.activityHistory ?? []), { at, state, event, turnId: turnId ?? null }];
+}
+
 export class Store {
   declare db: DatabaseSync;
   declare now: () => number;
@@ -83,6 +94,7 @@ export class Store {
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS entities (kind TEXT NOT NULL, id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, task_id TEXT, at TEXT NOT NULL, body TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS events_task_id ON events(task_id);
       CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, body TEXT NOT NULL);
@@ -120,8 +132,19 @@ export class Store {
   }
   snapshot(): Snapshot {
     const sessions = this.sessions();
+    const tasks = this.all('task');
+    const sessionById = new Map(sessions.map(session => [session.id, session]));
+    for (const task of tasks) {
+      const session = task.sessionId && sessionById.get(task.sessionId);
+      if (!session || task.state === 'cancelled') continue;
+      for (const event of this.taskHistory(task.id)) {
+        if (event.type !== 'review' || event.decision !== 'accept') continue;
+        const history = session.activityHistory ?? [];
+        if (!history.some(item => item.state === 'confirmed' && item.at === event.at)) session.activityHistory = [...history, { at: event.at, state: 'confirmed', event: 'task_confirmation', turnId: null }];
+      }
+    }
     return {
-      tasks: this.all('task').map(t => {
+      tasks: tasks.map(t => {
         const session = sessions.find(s => s.id === t.sessionId);
         return { ...t, ai: session ? { ...session, mode: t.state === 'defining' ? 'planning' : 'execution' } : null };
       }),
@@ -182,7 +205,7 @@ export class Store {
   }
   syncCodexThreads(threads: CodexThread[], complete = true) {
     return this.transaction(() => {
-      const existing = new Map(this.sessions().map(session => { const { state, ...stored } = session; return [session.id, stored]; }));
+      const existing = new Map(this.sessions().map(session => { const { state, ...stored } = session; return [session.id, preserveConfirmation(stored)]; }));
       const seen = new Set(); let added = 0, updated = 0;
       for (const thread of threads) {
         if (seen.has(thread.id)) continue;
@@ -197,8 +220,11 @@ export class Store {
           Object.assign(session, { observedState: thread.state, observedAt: this.at(), event: 'thread/list', source: 'codex-app-server', ...observation });
           if (!['idle', 'completed'].includes(runtimeState(thread.state)) || (observation && observation.turnId !== previous?.turnId)) delete session.confirmedAt;
         }
+        if (!retainHook && (thread.state !== 'unknown' || observation)) recordSessionActivity(session, previous ?? null, runtimeState(session.observedState), observation?.observedAt ?? thread.updatedAt, session.event, session.turnId);
         if (JSON.stringify(session) === JSON.stringify(previous)) continue;
         this.db.prepare('INSERT OR REPLACE INTO sessions VALUES (?,?)').run(session.id, JSON.stringify(session));
+        if (!retainHook && observation && ['task_started', 'UserPromptSubmit'].includes(observation.event)) this.reopenAcceptedTask(session.id, observation.observedAt, observation.turnId, previous?.turnId);
+        else if (!retainHook && !observation && ['running', 'queued'].includes(runtimeState(thread.state))) this.reopenAcceptedTask(session.id, thread.updatedAt);
         previous ? updated++ : added++;
       }
       for (const previous of existing.values()) if (complete && previous.catalogVisible !== false && !seen.has(previous.id)) {
@@ -338,19 +364,26 @@ export class Store {
     task.state = c.decision === 'accept' ? 'accepted' : 'changes_requested';
     task.revision++; task.updatedAt = this.at();
     task.review = { decision: c.decision, reviewer: c.reviewer, note: c.note, at: this.at(), reviewedRevision: c.revision };
-    this.save('task', task); this.event(task.id, 'review', { ...task.review, delivery: task.delivery }); return task;
+    this.save('task', task); this.event(task.id, 'review', { ...task.review, delivery: task.delivery });
+    if (task.sessionId && c.decision === 'accept') {
+      const row = this.db.prepare('SELECT body FROM sessions WHERE id=?').get(task.sessionId);
+      if (row) { const session = JSON.parse(row.body as string) as Session; recordSessionActivity(session, session, 'confirmed', task.review.at, 'task_confirmation', session.turnId); this.db.prepare('UPDATE sessions SET body=? WHERE id=?').run(JSON.stringify(session), session.id); }
+    }
+    return task;
   }
   confirmSession(raw: unknown): Session {
     const c = sessionConfirmSchema.parse(raw);
     return this.transaction(() => {
       const row = this.db.prepare('SELECT body FROM sessions WHERE id=?').get(c.id);
       requireThat(row, "errors.sessionMissing", 404);
-      const session = JSON.parse(row.body as string);
+      let session = preserveConfirmation(JSON.parse(row.body as string));
       requireThat(session.observedAt === c.observedAt && session.event === c.event && (session.turnId ?? null) === c.turnId && (session.catalogUpdatedAt ?? null) === c.catalogUpdatedAt, "errors.staleSession", 409);
       requireThat(['idle', 'completed'].includes(runtimeState(session.observedState)), "errors.confirmState");
       requireThat(!this.all('task').some(task => task.sessionId === c.id && task.state !== 'cancelled'), "errors.taskAcceptance");
       if (!session.confirmedAt) {
         session.confirmedAt = this.at();
+        session = preserveConfirmation(session);
+        recordSessionActivity(session, session, 'confirmed', session.confirmedAt!, 'human_confirmation', session.turnId);
         this.db.prepare('UPDATE sessions SET body=? WHERE id=?').run(JSON.stringify(session), session.id);
       }
       return session;
@@ -384,16 +417,27 @@ export class Store {
     }
     f.revision++; return this.setMeta('focus', f);
   }
+  private reopenAcceptedTask(sessionId: string, observedAt: string, turnId?: string | null, previousTurnId?: string | null) {
+    for (const task of this.all('task').filter(task => task.sessionId === sessionId && task.state === 'accepted')) {
+      if (Date.parse(observedAt) <= Date.parse(task.review?.at ?? task.updatedAt) || (turnId && turnId === previousTurnId)) continue;
+      task.state = 'executing'; task.revision++; task.updatedAt = observedAt;
+      delete task.review; delete task.delivery;
+      this.save('task', task); this.event(task.id, 'session_resumed', { revision: task.revision, state: task.state, sessionId });
+    }
+  }
   observe(raw: unknown): Session {
     const event = z.object({ session_id: id, hook_event_name: z.enum(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Stop', 'Interrupt', 'SessionEnd']), cwd: z.string().max(2000), turn_id: z.string().max(200).optional() }).parse(raw);
     return this.transaction(() => {
       const row = this.db.prepare('SELECT body FROM sessions WHERE id=?').get(event.session_id);
-      const previous = row ? JSON.parse(row.body as string) : null;
+      const previous = row ? preserveConfirmation(JSON.parse(row.body as string)) : null;
       if (['Stop', 'Interrupt'].includes(event.hook_event_name) && previous?.turnId && event.turn_id && previous.turnId !== event.turn_id) return previous;
       const states = { SessionStart: 'idle', UserPromptSubmit: 'running', PreToolUse: 'running', PostToolUse: 'running', PermissionRequest: 'waiting_approval', Stop: 'idle', Interrupt: 'interrupted', SessionEnd: 'completed' };
       const session = { ...previous, id: event.session_id, cwd: event.cwd, observedState: states[event.hook_event_name], observedAt: this.at(), event: event.hook_event_name, turnId: event.turn_id ?? previous?.turnId ?? null, source: 'codex-hook' };
       if (!['SessionStart', 'Stop', 'SessionEnd'].includes(event.hook_event_name) || session.turnId !== previous?.turnId) delete session.confirmedAt;
-      this.db.prepare('INSERT OR REPLACE INTO sessions VALUES (?,?)').run(session.id, JSON.stringify(session)); return session;
+      recordSessionActivity(session, previous, session.observedState, session.observedAt, session.event, session.turnId);
+      this.db.prepare('INSERT OR REPLACE INTO sessions VALUES (?,?)').run(session.id, JSON.stringify(session));
+      if (event.hook_event_name === 'UserPromptSubmit') this.reopenAcceptedTask(session.id, session.observedAt, event.turn_id, previous?.turnId);
+      return session;
     });
   }
   tick() {

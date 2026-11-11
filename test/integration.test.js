@@ -44,7 +44,7 @@ createInterface({ input: process.stdin }).on('line', line => {
   await client.connect(transport);
   assert.equal(oldStopped, true);
   assert.equal((await fetch(`${origin}/health`).then(response => response.json())).version, JSON.parse(readFileSync('package.json', 'utf8')).version);
-  const tools = await client.listTools(); assert.equal(tools.tools.length, 7);
+  const tools = await client.listTools(); assert.equal(tools.tools.length, 8);
   assert.equal(tools.tools.find(tool => tool.name === 'ai_todos_snapshot').inputSchema.properties.syncThreads.type, 'boolean');
   assert.deepEqual(tools.tools.find(tool => tool.name === 'ai_todos_confirm_session')._meta.ui.visibility, ['app']);
   assert.deepEqual(tools.tools.find(tool => tool.name === 'ai_todos_complete_task')._meta.ui.visibility, ['app']);
@@ -53,7 +53,7 @@ createInterface({ input: process.stdin }).on('line', line => {
   const resources = await client.listResources(); assert.equal(resources.resources[0].uri, 'ui://ai-todos/app.html');
   const resource = await client.readResource({ uri: 'ui://ai-todos/app.html' }); assert.equal(resource.contents[0].mimeType, 'text/html;profile=mcp-app'); assert.ok(resource.contents[0].text.includes(origin));
   assert.deepEqual(resource.contents[0]._meta['openai/ui'].availableDisplayModes, ['inline', 'fullscreen']);
-  const opened = await client.callTool({ name: 'ai_todos_open', arguments: {} }); assert.equal(opened.structuredContent.browserUrl, origin);
+  const opened = await client.callTool({ name: 'ai_todos_open', arguments: {} }); assert.equal(opened.structuredContent.browserUrl, origin); assert.equal(opened.structuredContent.tasks, undefined);
   const command = async c => {
     const result = await client.callTool({ name: 'ai_todos_manage', arguments: { command: c } });
     assert.ok(!result.isError, result.content?.[0]?.text); return result.structuredContent;
@@ -63,6 +63,13 @@ createInterface({ input: process.stdin }).on('line', line => {
   assert.equal(staleCommand.isError, true);
   assert.equal(staleCommand.structuredContent.code, 'errors.staleRevision');
   assert.match(staleCommand.content[0].text, /数据已更新/);
+  const workspace = await client.callTool({ name: 'ai_todos_workspace', arguments: {} });
+  assert.ok(!workspace.isError);
+  assert.equal(workspace.structuredContent.tasks[0].id, task.id);
+  assert.ok(workspace.content[0].text.length < 100);
+  const full = await client.callTool({ name: 'ai_todos_snapshot', arguments: {} });
+  assert.deepEqual(workspace.structuredContent.tasks, full.structuredContent.tasks);
+  assert.deepEqual(workspace.structuredContent.sessions, full.structuredContent.sessions);
   const synced = await client.callTool({ name: 'ai_todos_snapshot', arguments: { syncThreads: true } });
   assert.ok(!synced.isError, synced.content?.[0]?.text);
   assert.equal(synced.structuredContent.sessions.find(session => session.id === sessionId).title, thread.name);

@@ -7,10 +7,12 @@ import { runtimeState } from '../src/runtime.ts';
 import { labels, runtimeLabel } from './format.ts';
 
 export const boardColumns: { id: string; label: TranslationKey; stages: string[]; dropTarget: string }[] = [
-  { id: 'unstarted', label: "board.unstarted", stages: ['defining', 'ready', 'changes_requested'], dropTarget: 'ready' },
-  { id: 'executing', label: "board.executing", stages: ['executing'], dropTarget: 'executing' },
-  { id: 'waiting_user', label: "board.waitingUser", stages: ['waiting_user'], dropTarget: 'waiting_user' },
-  { id: 'completed', label: "board.completed", stages: ['completed'], dropTarget: 'completed' },
+  { id: 'waiting_user', label: 'board.waitingUser', stages: ['waiting_user'], dropTarget: 'waiting_user' },
+  { id: 'waiting_confirmation', label: 'activity.pending', stages: ['waiting_confirmation'], dropTarget: 'waiting_confirmation' },
+  { id: 'executing', label: 'board.executing', stages: ['executing'], dropTarget: 'executing' },
+  { id: 'completed', label: 'board.completed', stages: ['completed'], dropTarget: 'completed' },
+  { id: 'unknown', label: 'runtime.unknown', stages: ['unknown'], dropTarget: 'unknown' },
+  { id: 'unstarted', label: 'board.unstarted', stages: ['defining', 'ready', 'changes_requested'], dropTarget: 'ready' },
 ];
 export function executionColumnForTask(task: Pick<Task, 'state' | 'ai'>, runtime = task.ai) {
   if (task.state === 'cancelled') return 'cancelled';
@@ -21,13 +23,14 @@ export function executionColumnForTask(task: Pick<Task, 'state' | 'ai'>, runtime
     if (runtime.mode === 'planning') {
       if (['waiting_approval', 'waiting_input'].includes(state)) return 'waiting_user';
       if (['queued', 'running'].includes(state)) return 'executing';
-      if (['idle', 'completed'].includes(state) && task.state === 'defining' && (runtime.turnId || runtime.event === 'Stop')) return 'waiting_user';
+      if (['idle', 'completed'].includes(state) && task.state === 'defining' && (runtime.turnId || runtime.event === 'Stop')) return 'waiting_confirmation';
     }
     if (['queued', 'running'].includes(state)) return 'executing';
     if (['waiting_approval', 'waiting_input', 'failed'].includes(state)) return 'waiting_user';
-    if (['idle', 'completed'].includes(state) && (runtime.turnId || runtime.event === 'Stop')) return 'waiting_user';
+    if (['idle', 'completed'].includes(state) && (runtime.turnId || runtime.event === 'Stop')) return 'waiting_confirmation';
     if (state === 'interrupted') return 'ready';
-    if (['completed', 'idle', 'unknown'].includes(state) && task.state === 'executing') return 'waiting_user';
+    if (['completed', 'idle'].includes(state) && task.state === 'executing') return 'waiting_confirmation';
+    if (state === 'unknown' && task.state === 'executing') return 'unknown';
   }
   return task.state;
 }
@@ -52,6 +55,7 @@ export function taskNextStep(task: Pick<Task, 'state' | 'ai' | 'sessionId'>): { 
     if (runtime === 'failed' || runtime === 'interrupted') return { action: 'session', label: 'task.resumeSession', hint: 'task.nextResume' };
     return { action: 'session', label: 'task.viewProgress', hint: 'task.nextRunning' };
   }
+  if (task.sessionId && runtime === 'unknown') return { action: 'session', label: 'task.viewProgress', hint: 'activity.unknownHint' };
   if (!task.sessionId && !task.ai && ['defining', 'ready', 'changes_requested'].includes(task.state)) {
     return { action: 'start', label: 'task.startWork', hint: 'task.nextStart' };
   }
@@ -61,21 +65,17 @@ export function executionColumnForSession(session: Pick<LiveSession, 'state' | '
   const state = runtimeState(session.state);
   if (state === 'running' || state === 'queued') return 'executing';
   if (session.confirmedAt && ['idle', 'completed'].includes(state)) return 'completed';
-  if (['waiting_input', 'waiting_approval', 'failed', 'interrupted', 'idle', 'completed'].includes(state)) return 'waiting_user';
+  if (['idle', 'completed'].includes(state)) return 'waiting_confirmation';
+  if (['waiting_input', 'waiting_approval', 'failed', 'interrupted'].includes(state)) return 'waiting_user';
   if (state === 'unknown' && ['queued', 'running', 'waiting_approval', 'waiting_input'].includes(runtimeState(session.observedState))) return 'waiting_user';
-  return null;
+  return 'unknown';
 }
 export function canConfirmAiSession(session: Pick<LiveSession, 'id' | 'state' | 'confirmedAt'>, tasks: Pick<Task, 'sessionId' | 'state'>[]) {
-  return executionColumnForSession(session) === 'waiting_user' && ['idle', 'completed'].includes(runtimeState(session.state))
+  return executionColumnForSession(session) === 'waiting_confirmation' && ['idle', 'completed'].includes(runtimeState(session.state))
     && !tasks.some(task => task.sessionId === session.id && task.state !== 'cancelled');
 }
 export function visibleExecutionSessions(sessions: LiveSession[], tasks: Task[]) {
-  return sessions.filter(session => !tasks.some(task => {
-    if (task.sessionId !== session.id || task.state === 'cancelled') return false;
-    if (task.state === 'accepted') return ['idle', 'completed'].includes(runtimeState(session.state))
-      && Date.parse(task.review?.at ?? '') >= Date.parse(session.observedAt);
-    return true;
-  }));
+  return sessions.filter(session => !tasks.some(task => task.sessionId === session.id && task.state !== 'cancelled'));
 }
 export function boardDropDecision(task: Pick<Task, 'state' | 'ai' | 'sessionId'>, target: string): { action?: 'start' | 'request_changes'; reason?: string } {
   const source = executionColumnForTask(task), runtime = runtimeState(task.ai?.state);

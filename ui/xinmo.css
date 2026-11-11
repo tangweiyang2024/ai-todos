@@ -387,7 +387,7 @@
 .execution-column > header i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .execution-column.column-unstarted > header i { background: var(--blue); }
 .execution-column.column-executing > header i { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-.execution-column.column-waiting_user > header i { background: var(--warning); }
+.execution-column.column-waiting_user > header i, .execution-column.column-waiting_confirmation > header i { background: var(--warning); }
 .execution-column.column-completed > header i { background: var(--accent); }
 .execution-column > header strong { overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .execution-column > header em { min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--fill-2); color: var(--muted); font-size: var(--fs-caption); font-style: normal; font-variant-numeric: tabular-nums; text-align: center; }
@@ -574,3 +574,12 @@
 .project-tree-item > summary > svg { color: var(--faint); }
 .independent-actions { display: grid; gap: 5px; margin: 0 9px 9px; }
 .linked-task-list { display: grid; }
+
+.execution-card__preview { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: pre-wrap; }
+.execution-card__activity { color: var(--muted); font-size: 10px; }
+
+.session-history { display: grid; gap: 8px; max-width: 1100px; }
+.session-history__item { display: grid; grid-template-columns: 105px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.session-history__item time { color: var(--muted); font-size: 11px; }
+.session-history__item strong { margin-right: 10px; }
+.session-history__item p { margin-top: 6px; }

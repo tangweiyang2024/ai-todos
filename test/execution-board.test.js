@@ -26,7 +26,7 @@ test('all Xinmo runtime states and planning labels retain their board meaning', 
     queued: ['等待执行', 'executing'], running: ['正在执行', 'executing'],
     waiting_approval: ['等待审批', 'waiting_user'], waiting_input: ['等待输入', 'waiting_user'],
     interrupted: ['已中断', 'waiting_user'], failed: ['执行失败', 'waiting_user'],
-    completed: ['待确定', 'waiting_user'], idle: ['待确定', 'waiting_user'], unknown: ['状态未确认', null],
+    completed: ['待确定', 'waiting_confirmation'], idle: ['待确定', 'waiting_confirmation'], unknown: ['状态未确认', 'unknown'],
   };
   assert.deepEqual(Object.keys(runtimeLabels), Object.keys(expected));
   for (const [state, [label, column]] of Object.entries(expected)) {
@@ -51,19 +51,21 @@ test('stale active sessions remain visible without being eligible for completion
     assert.equal(runtimeLabel(session), '状态未确认');
     assert.equal(canConfirmAiSession(session, []), false);
   }
-  assert.equal(executionColumnForSession({ ...runtime('unknown'), observedState: 'unknown' }), null);
+  assert.equal(executionColumnForSession({ ...runtime('unknown'), observedState: 'unknown' }), 'unknown');
   assert.equal(canConfirmAiSession(runtime('interrupted'), []), false);
 });
 
 test('Xinmo task stages combine business state and runtime instead of leaving stopped work executing', () => {
   for (const [state, column] of Object.entries({ defining: 'defining', ready: 'ready', executing: 'executing', awaiting_acceptance: 'waiting_user', changes_requested: 'changes_requested', accepted: 'completed', cancelled: 'cancelled' })) assert.equal(executionColumnForTask(task(state)), column);
-  for (const state of ['waiting_input', 'waiting_approval', 'failed', 'idle', 'completed', 'unknown']) assert.equal(executionColumnForTask(task('executing', runtime(state))), 'waiting_user');
+  for (const state of ['waiting_input', 'waiting_approval', 'failed']) assert.equal(executionColumnForTask(task('executing', runtime(state))), 'waiting_user');
+  for (const state of ['idle', 'completed']) assert.equal(executionColumnForTask(task('executing', runtime(state))), 'waiting_confirmation');
+  assert.equal(executionColumnForTask(task('executing', runtime('unknown'))), 'unknown');
   assert.equal(executionColumnForTask(task('executing', runtime('interrupted'))), 'ready');
   assert.equal(executionColumnForTask(task('defining', runtime('running'))), 'executing');
   assert.equal(executionColumnForTask(task('defining', { ...runtime('idle'), mode: 'planning' })), 'defining');
   assert.equal(executionColumnForTask(task('defining', { ...runtime('completed'), mode: 'planning', event: 'SessionEnd', turnId: null })), 'defining');
-  assert.equal(executionColumnForTask(task('defining', { ...runtime('idle'), mode: 'planning', turnId: 'real-turn' })), 'waiting_user');
-  assert.equal(executionColumnForTask(task('defining', { ...runtime('completed'), mode: 'planning', event: 'Stop' })), 'waiting_user');
+  assert.equal(executionColumnForTask(task('defining', { ...runtime('idle'), mode: 'planning', turnId: 'real-turn' })), 'waiting_confirmation');
+  assert.equal(executionColumnForTask(task('defining', { ...runtime('completed'), mode: 'planning', event: 'Stop' })), 'waiting_confirmation');
   assert.equal(taskStatus(task('executing', runtime('idle'))), '待确认完成');
   assert.equal(taskStatus(task('awaiting_acceptance', runtime('idle'))), '待我验收');
   assert.equal(taskStatus(task('accepted', runtime('running'))), '已完成');
@@ -74,7 +76,7 @@ test('task next steps prioritize starting work before manual completion, session
   const stopped = runtime('idle');
   assert.equal(taskStatus(task('defining', { ...stopped, mode: 'planning', event: 'Stop' })), '待确认完成');
   assert.equal(taskStatus(task('ready', stopped)), '待确认完成');
-  assert.equal(executionColumnForTask(task('ready', { ...stopped, event: 'Stop' })), 'waiting_user');
+  assert.equal(executionColumnForTask(task('ready', { ...stopped, event: 'Stop' })), 'waiting_confirmation');
   for (const state of ['defining', 'ready', 'changes_requested']) {
     assert.equal(taskNextStep(task(state)).action, 'start');
     assert.equal(taskNextStep(task(state, stopped)).action, 'complete');
@@ -105,9 +107,9 @@ test('confirmation, represented sessions and post-acceptance activity match Xinm
   const accepted = { ...owner, state: 'accepted', review: { at: '2026-10-10T00:01:00Z' } };
   assert.deepEqual(visibleExecutionSessions([ended], [accepted]), []);
   const resumed = runtime('running');
-  assert.deepEqual(visibleExecutionSessions([resumed], [accepted]), [resumed]);
+  assert.deepEqual(visibleExecutionSessions([resumed], [accepted]), []);
   const newerEnd = { ...ended, observedAt: '2026-10-10T00:02:00Z' };
-  assert.deepEqual(visibleExecutionSessions([newerEnd], [accepted]), [newerEnd]);
+  assert.deepEqual(visibleExecutionSessions([newerEnd], [accepted]), []);
   assert.equal(canConfirmAiSession(newerEnd, [accepted]), false);
   const confirmed = { ...ended, confirmedAt: ended.observedAt };
   assert.equal(executionColumnForSession(confirmed), 'completed');

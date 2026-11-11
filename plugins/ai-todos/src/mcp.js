@@ -42533,6 +42533,31 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default3 = {
+  "workspace.more": "Show {{count}} more sessions",
+  "workspace.attention": "Needs your attention",
+  "workspace.running": "Running",
+  "workspace.confirmed": "Confirmed",
+  "workspace.sessionCount": "{{count}} sessions",
+  "workspace.hook": "Codex live event",
+  "workspace.hostSource": "Codex host status",
+  "workspace.historySource": "Historical observation",
+  "workspace.viewHistory": "View history",
+  "workspace.empty": "No matching sessions",
+  "workspace.list": "List",
+  "workspace.subtitle": "Handle what needs you, then check running sessions",
+  "workspace.label": "Workspace",
+  "workspace.projects": "Projects",
+  "workspace.history": "Session history",
+  "workspace.allProjects": "All projects",
+  "activity.unknownHint": "The session state is unknown. Open it to check.",
+  "activity.sessions": "Sessions",
+  "activity.title": "Activity",
+  "activity.pending": "Awaiting confirmation",
+  "activity.confirmed": "Confirmed complete",
+  "activity.hint": "Observed state changes and human confirmations. Unrecorded history is not reconstructed.",
+  "activity.empty": "No session activity yet",
+  "activity.more": "Show {{count}} more",
+  "card.lastActivity": "Last activity: {{at}}",
   "task.nextComplete": "If this task is done, confirm completion to move it to Completed.",
   "task.startWork": "Start in Codex",
   "task.nextStart": "Open a Codex chat to start this task.",
@@ -42548,7 +42573,7 @@ var en_default3 = {
   "time.todaySelected": "Today, {{date}}, selected",
   "app.title": "Todos \xB7 Workspace",
   "nav.today": "Home",
-  "nav.work": "Tasks",
+  "nav.work": "Sessions",
   "nav.projects": "Projects",
   "nav.okr": "OKRs",
   "nav.inbox": "Inbox",
@@ -42760,7 +42785,7 @@ var en_default3 = {
   "time.selectDate": "Select date",
   "time.selectDateTime": "Select date and time",
   "time.clear": "Clear",
-  "timeline.mode": "Timeline",
+  "timeline.mode": "Activity",
   "timeline.window": "Scheduled: {{count, number}} tasks",
   "timeline.window_one": "Scheduled: {{count, number}} task",
   "timeline.window_other": "Scheduled: {{count, number}} tasks",
@@ -43123,6 +43148,31 @@ var en_default3 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "workspace.more": "\u518D\u663E\u793A {{count}} \u4E2A\u4F1A\u8BDD",
+  "workspace.attention": "\u9700\u8981\u4F60\u5904\u7406",
+  "workspace.running": "\u6B63\u5728\u8FD0\u884C",
+  "workspace.confirmed": "\u5DF2\u786E\u8BA4",
+  "workspace.sessionCount": "{{count}} \u4E2A\u4F1A\u8BDD",
+  "workspace.hook": "Codex \u5B9E\u65F6\u4E8B\u4EF6",
+  "workspace.hostSource": "Codex \u5BBF\u4E3B\u72B6\u6001",
+  "workspace.historySource": "\u5386\u53F2\u89C2\u5BDF",
+  "workspace.viewHistory": "\u67E5\u770B\u8BB0\u5F55",
+  "workspace.empty": "\u6CA1\u6709\u5339\u914D\u7684\u4F1A\u8BDD",
+  "workspace.list": "\u5217\u8868",
+  "workspace.subtitle": "\u5148\u5904\u7406\u9700\u8981\u4F60\u7684\u4E8B\uFF0C\u518D\u5173\u6CE8\u6B63\u5728\u8FD0\u884C\u7684\u4F1A\u8BDD",
+  "workspace.label": "\u5DE5\u4F5C\u7A7A\u95F4",
+  "workspace.projects": "\u9879\u76EE",
+  "workspace.history": "\u4F1A\u8BDD\u8BB0\u5F55",
+  "workspace.allProjects": "\u5168\u90E8\u9879\u76EE",
+  "activity.unknownHint": "\u4F1A\u8BDD\u72B6\u6001\u6682\u4E0D\u53EF\u786E\u8BA4\uFF0C\u8BF7\u6253\u5F00\u4F1A\u8BDD\u67E5\u770B\u3002",
+  "activity.sessions": "\u4F1A\u8BDD",
+  "activity.title": "\u4F1A\u8BDD\u8BB0\u5F55",
+  "activity.pending": "\u5F85\u786E\u8BA4\u5B8C\u6210",
+  "activity.confirmed": "\u4EBA\u5DE5\u786E\u8BA4\u5B8C\u6210",
+  "activity.hint": "\u8BB0\u5F55\u5DF2\u89C2\u5BDF\u5230\u7684\u72B6\u6001\u53D8\u5316\u548C\u4EBA\u5DE5\u786E\u8BA4\uFF1B\u672A\u8BB0\u5F55\u7684\u5386\u53F2\u4E0D\u4F1A\u8865\u9020\u3002",
+  "activity.empty": "\u6682\u65E0\u4F1A\u8BDD\u6D3B\u52A8\u8BB0\u5F55",
+  "activity.more": "\u518D\u663E\u793A {{count}} \u6761",
+  "card.lastActivity": "\u6700\u8FD1\u6D3B\u52A8\uFF1A{{at}}",
   "task.nextComplete": "\u5982\u679C\u8FD9\u9879\u4EFB\u52A1\u5DF2\u7ECF\u505A\u5B8C\uFF0C\u70B9\u51FB\u201C\u786E\u8BA4\u5B8C\u6210\u201D\u79FB\u5230\u5DF2\u5B8C\u6210\u3002",
   "task.startWork": "\u5728 Codex \u5F00\u59CB",
   "task.nextStart": "\u6253\u5F00 Codex \u4F1A\u8BDD\uFF0C\u5F00\u59CB\u5904\u7406\u8FD9\u9879\u4EFB\u52A1\u3002",
@@ -43138,7 +43188,7 @@ var zh_CN_default2 = {
   "time.todaySelected": "\u4ECA\u5929\uFF0C{{date}}\uFF0C\u5DF2\u9009\u4E2D",
   "app.title": "\u4EFB\u52A1 \xB7 \u5DE5\u4F5C\u53F0",
   "nav.today": "\u9996\u9875",
-  "nav.work": "\u4EFB\u52A1",
+  "nav.work": "\u4F1A\u8BDD",
   "nav.projects": "\u9879\u76EE",
   "nav.okr": "OKR",
   "nav.inbox": "\u6536\u4EF6\u7BB1",
@@ -43344,7 +43394,7 @@ var zh_CN_default2 = {
   "time.selectDate": "\u9009\u62E9\u65E5\u671F",
   "time.selectDateTime": "\u9009\u62E9\u65E5\u671F\u548C\u65F6\u95F4",
   "time.clear": "\u6E05\u9664",
-  "timeline.mode": "\u65F6\u95F4\u7EBF",
+  "timeline.mode": "\u4F1A\u8BDD\u8BB0\u5F55",
   "timeline.window": "\u8BA1\u5212\u7A97\u53E3\uFF1A{{count, number}} \u9879",
   "timeline.window_other": "\u8BA1\u5212\u7A97\u53E3\uFF1A{{count, number}} \u9879",
   "timeline.backward": "\u4E0A\u4E00\u6BB5",
@@ -43819,7 +43869,7 @@ import { join as join3 } from "node:path";
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.20",
+  version: "0.1.21",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",
@@ -43933,12 +43983,20 @@ var guarded = (fn) => async (args) => {
 var openToolConfig = {
   icons,
   title: "\u4EFB\u52A1",
-  description: "Open the local ai-todos task, OKR, plan, focus and delivery workspace. If this host cannot render MCP Apps, open browserUrl in its browser.",
+  description: "Open the local ai-todos session and task workspace. If this host cannot render MCP Apps, open browserUrl in its browser.",
   inputSchema: external_exports.object({}),
   annotations: { readOnlyHint: true, openWorldHint: false },
   _meta: { ui: { resourceUri: uri }, "openai/ui": { entrypoints: [{ type: "global" }, { type: "thread" }] } }
 };
-j(server, "ai_todos_open", openToolConfig, guarded(async () => ({ ...await service("state"), browserUrl: origin })));
+j(server, "ai_todos_open", openToolConfig, guarded(async () => ({ browserUrl: origin })));
+server.registerTool("ai_todos_workspace", { description: "Read workspace state for the ai-todos interface.", inputSchema: external_exports.object({}), annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, async () => {
+  try {
+    return { content: [{ type: "text", text: "Workspace state ready." }], structuredContent: await service("state") };
+  } catch (error62) {
+    const payload = errorPayload(error62);
+    return { isError: true, content: [{ type: "text", text: String(payload.error) }], structuredContent: payload };
+  }
+});
 server.registerTool("ai_todos_snapshot", { description: "Read persistent tasks, inbox captures, projects, OKRs, plans, trusted hook sessions, focus and reminders. Set syncThreads=true to refresh the official existing-session catalog before reading, for binding a host-created conversation. This does not create or execute conversations. Observed AI state is independent of task business state.", inputSchema: external_exports.object({ syncThreads: external_exports.boolean().optional() }), annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["model", "app"] } } }, guarded(async (args) => {
   if (args.syncThreads) await service("codex", { operation: "sync_threads" });
   return service("state");

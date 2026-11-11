@@ -57,3 +57,85 @@ test('human session confirmation checks the displayed version and binding, and c
   now += 300001;
   assert.ok(s.sessions().filter(session => session.id !== id).every(session => session.state === 'unknown'));
 });
+
+test('a new turn reopens an accepted linked task and requires fresh human confirmation', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'ai-todos-reopen-'));
+  let now = Date.parse('2026-10-10T00:00:00Z');
+  const s = new Store(join(dir, 'data.sqlite'), () => now);
+  t.after(() => { s.close(); rmSync(dir, { recursive: true, force: true }); });
+  const id = randomUUID();
+  const observe = (event, turn) => { now++; return s.observe({ session_id: id, cwd: '/tmp/project', hook_event_name: event, turn_id: turn }); };
+  observe('UserPromptSubmit', 'first');
+  let task = s.command({ action: 'create', kind: 'task', requestId: randomUUID(), data: { title: '任务' } });
+  task = s.command({ action: 'bind', id: task.id, revision: task.revision, sessionId: id });
+  observe('Stop', 'first');
+  task = s.completeTask({ id: task.id, revision: task.revision, confirmed: true });
+  observe('SessionEnd', 'first');
+  assert.equal(s.get('task', task.id).state, 'accepted');
+  observe('UserPromptSubmit', 'second');
+  task = s.get('task', task.id);
+  assert.equal(task.state, 'executing');
+  assert.throws(() => s.completeTask({ id: task.id, revision: task.revision, confirmed: true }), /仍在处理/);
+  observe('Stop', 'second');
+  assert.equal(s.get('task', task.id).state, 'executing');
+  task = s.completeTask({ id: task.id, revision: task.revision, confirmed: true });
+  assert.equal(task.state, 'accepted');
+  assert.equal(s.taskHistory(task.id).filter(e => e.type === 'review').length, 2);
+  assert.equal(s.snapshot().sessions.find(session => session.id === id).activityHistory.filter(e => e.state === 'confirmed').length, 2);
+  const stored = JSON.parse(s.db.prepare('SELECT body FROM sessions WHERE id=?').get(id).body);
+  stored.activityHistory = stored.activityHistory.filter(e => e.state !== 'confirmed');
+  s.db.prepare('UPDATE sessions SET body=? WHERE id=?').run(JSON.stringify(stored), id);
+  assert.equal(s.snapshot().sessions.find(session => session.id === id).activityHistory.filter(e => e.state === 'confirmed').length, 2);
+});
+
+test('host sync reopens an accepted task only when it observes newer active work', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'ai-todos-sync-reopen-'));
+  let now = Date.parse('2026-10-10T00:00:00Z');
+  const s = new Store(join(dir, 'data.sqlite'), () => now);
+  t.after(() => { s.close(); rmSync(dir, { recursive: true, force: true }); });
+  const id = randomUUID();
+  const thread = { id, title: '会话', cwd: '/tmp/project', updatedAt: s.at(), state: 'idle' };
+  s.syncCodexThreads([thread]);
+  let task = s.command({ action: 'create', kind: 'task', requestId: randomUUID(), data: { title: '任务' } });
+  task = s.command({ action: 'bind', id: task.id, revision: task.revision, sessionId: id });
+  now++; task = s.completeTask({ id: task.id, revision: task.revision, confirmed: true });
+  s.syncCodexThreads([{ ...thread, state: 'running' }]);
+  assert.equal(s.get('task', task.id).state, 'accepted');
+  now++; s.syncCodexThreads([{ ...thread, state: 'running', updatedAt: s.at() }]);
+  assert.equal(s.get('task', task.id).state, 'executing');
+});
+
+test('session confirmation history survives later turns and remains distinct from current completion', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'ai-todos-history-'));
+  let now = Date.parse('2026-10-10T00:00:00Z');
+  const s = new Store(join(dir, 'data.sqlite'), () => now);
+  t.after(() => { s.close(); rmSync(dir, { recursive: true, force: true }); });
+  const id = randomUUID();
+  const observe = (event, turn) => { now++; s.observe({ session_id: id, cwd: '/tmp', hook_event_name: event, turn_id: turn }); };
+  const confirm = () => { const x = s.sessions().find(x => x.id === id); now++; return s.confirmSession({ id, observedAt: x.observedAt, event: x.event, turnId: x.turnId ?? null, catalogUpdatedAt: x.catalogUpdatedAt ?? null, confirmed: true }); };
+  observe('UserPromptSubmit', 'one'); observe('Stop', 'one');
+  const first = confirm();
+  observe('UserPromptSubmit', 'two');
+  let current = s.sessions().find(x => x.id === id);
+  assert.equal(current.confirmedAt, undefined);
+  assert.equal(current.confirmationHistory.length, 1);
+  assert.equal(current.confirmationHistory[0].at, first.confirmedAt);
+  observe('Stop', 'two'); const second = confirm();
+  assert.equal(second.confirmationHistory.length, 2);
+  assert.deepEqual(second.confirmationHistory.map(x => x.turnId), ['one', 'two']);
+});
+
+test('session activity records meaningful status changes and human confirmations, not every tool call', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'ai-todos-activity-'));
+  let now = Date.parse('2026-10-10T00:00:00Z');
+  const s = new Store(join(dir, 'data.sqlite'), () => now);
+  t.after(() => { s.close(); rmSync(dir, { recursive: true, force: true }); });
+  const id = randomUUID();
+  const observe = (event, turn = 'one') => { now++; return s.observe({ session_id: id, cwd: '/tmp', hook_event_name: event, turn_id: turn }); };
+  observe('UserPromptSubmit'); observe('PreToolUse'); observe('PostToolUse'); observe('PermissionRequest'); observe('PostToolUse'); observe('Stop');
+  let x = s.sessions().find(x => x.id === id); now++;
+  s.confirmSession({ id, observedAt: x.observedAt, event: x.event, turnId: x.turnId ?? null, catalogUpdatedAt: x.catalogUpdatedAt ?? null, confirmed: true });
+  observe('UserPromptSubmit', 'two');
+  x = s.sessions().find(x => x.id === id);
+  assert.deepEqual(x.activityHistory.map(e => e.state), ['running', 'waiting_approval', 'running', 'idle', 'confirmed', 'running']);
+});
