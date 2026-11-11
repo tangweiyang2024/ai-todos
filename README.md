@@ -76,9 +76,8 @@ Keep using the same plugin source, `ai-todos@ai-todos`. The hook settings may sh
 - **Projects and OKRs:** organize tasks by project and track objectives and key results.
 - **Focus:** start, pause, resume, and end a timer. An active timer keeps running through sleep or closing Codex until you pause or end it.
 - **Review:** inspect the delivery summary and evidence, then accept or request changes. AI stopping does not automatically complete or accept a task.
-- **Settings:** choose Automatic, Simplified Chinese, or English, and configure reminders and time zone. Language changes apply immediately; your content stays in its original language.
+- **Settings:** choose Automatic, Simplified Chinese, or English, Language changes apply immediately; your content stays in its original language.
 
-Browser notifications require permission and an open page. Reminders pause while the service is stopped or the machine is asleep; they do not trigger AI execution.
 
 ## Run from source
 

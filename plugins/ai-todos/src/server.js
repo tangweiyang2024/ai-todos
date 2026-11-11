@@ -25686,6 +25686,10 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default2 = {
+  "session.historicalCompleted": "Completed (historical)",
+  "board.pending": "Needs confirmation",
+  "project.search": "Search projects",
+  "project.noMatches": "No matching projects",
   "workspace.more": "Show {{count}} more sessions",
   "workspace.attention": "Needs your attention",
   "workspace.running": "Running",
@@ -26301,6 +26305,10 @@ var en_default2 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "session.historicalCompleted": "\u5DF2\u5B8C\u6210\uFF08\u5386\u53F2\u5F52\u7C7B\uFF09",
+  "board.pending": "\u5F85\u786E\u8BA4",
+  "project.search": "\u641C\u7D22\u9879\u76EE\u540D\u79F0",
+  "project.noMatches": "\u6CA1\u6709\u5339\u914D\u7684\u9879\u76EE",
   "workspace.more": "\u518D\u663E\u793A {{count}} \u4E2A\u4F1A\u8BDD",
   "workspace.attention": "\u9700\u8981\u4F60\u5904\u7406",
   "workspace.running": "\u6B63\u5728\u8FD0\u884C",
@@ -26429,7 +26437,7 @@ var zh_CN_default2 = {
   "session.unlinked": "\u672A\u5173\u8054 AI",
   "session.source": "\u6765\u6E90\uFF1A{{value}} \xB7 {{value2}} \xB7 {{event}}",
   "session.observeHint": "\u540C\u6B65 Codex \u6216\u542F\u7528 hooks \u540E\u53EF\u89C2\u5BDF\uFF1B\u4E1A\u52A1\u6267\u884C\u4E2D\u4E0D\u4EE3\u8868 AI \u6B63\u5728\u8FD0\u884C",
-  "board.unstarted": "\u672A\u5F00\u59CB",
+  "board.unstarted": "\u5F85\u5F00\u59CB",
   "board.executing": "\u8FDB\u884C\u4E2D",
   "board.waitingUser": "\u9700\u8981\u4F60\u5904\u7406",
   "board.completed": "\u5DF2\u5B8C\u6210",
@@ -27445,28 +27453,6 @@ var Store = class {
       return session;
     });
   }
-  tick() {
-    return this.transaction(() => {
-      const s = this.settings();
-      const now = this.now();
-      const add = (key, title, taskId = null) => {
-        const notice = { id: randomUUID(), key, title, taskId, createdAt: this.at(), read: false };
-        if (!this.db.prepare("SELECT id FROM notices WHERE json_extract(body,'$.key')=?").get(key)) this.db.prepare("INSERT INTO notices VALUES (?,?)").run(notice.id, JSON.stringify(notice));
-      };
-      for (const t2 of this.all("task").filter((t3) => !["accepted", "cancelled"].includes(t3.state))) {
-        if (s.reminders && t2.remindAt && Date.parse(t2.remindAt) <= now) add(`reminder:${t2.id}:${t2.remindAt}`, `\u4EFB\u52A1\u63D0\u9192\uFF1A${t2.title}`, t2.id);
-        if (s.followUpMinutes && t2.state === "executing") {
-          const period = s.followUpMinutes * 6e4;
-          const slot = Math.floor((now - Date.parse(t2.updatedAt)) / period);
-          if (slot > 0) add(`follow:${t2.id}:${t2.updatedAt}:${slot}`, `\u8FDB\u5EA6\u8DDF\u8FDB\uFF1A${t2.title}`, t2.id);
-        }
-      }
-      if (s.reviewTime) {
-        const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: s.timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(now)).map((p) => [p.type, p.value]));
-        if (`${parts.hour}:${parts.minute}` >= s.reviewTime) add(`review:${s.timezone}:${parts.year}-${parts.month}-${parts.day}:${s.reviewTime}`, "\u6BCF\u65E5\u590D\u76D8\uFF1A\u56DE\u987E\u4EA4\u4ED8\u3001\u4E13\u6CE8\u65F6\u95F4\u4E0E\u660E\u65E5\u8BA1\u5212");
-      }
-    });
-  }
 };
 
 // src/codex.ts
@@ -27802,7 +27788,7 @@ async function codexAction(store2, raw) {
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.21",
+  version: "0.1.22",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",
@@ -27950,11 +27936,6 @@ var server = createServer(async (req, res) => {
   }
 });
 var timer = setInterval(() => {
-  try {
-    store.tick();
-  } catch (error62) {
-    console.error("Reminder scheduler:", error62 instanceof Error ? error62.message : String(error62));
-  }
   for (const [key, value] of sessions) if (value.expires < Date.now()) sessions.delete(key);
   for (const [key, value] of reviews) if (value.expires < Date.now()) reviews.delete(key);
 }, 15e3);
@@ -27968,7 +27949,6 @@ server.listen(port, "127.0.0.1", () => {
   mkdirSync2(dataDir, { recursive: true, mode: 448 });
   writeFileSync(runtimePath, JSON.stringify({ pid: process.pid, origin, token }), { mode: 384 });
   chmodSync(runtimePath, 384);
-  store.tick();
   console.error(`ai-todos listening at ${origin}`);
 });
 function shutdown() {

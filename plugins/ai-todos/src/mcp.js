@@ -42533,6 +42533,10 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default3 = {
+  "session.historicalCompleted": "Completed (historical)",
+  "board.pending": "Needs confirmation",
+  "project.search": "Search projects",
+  "project.noMatches": "No matching projects",
   "workspace.more": "Show {{count}} more sessions",
   "workspace.attention": "Needs your attention",
   "workspace.running": "Running",
@@ -43148,6 +43152,10 @@ var en_default3 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "session.historicalCompleted": "\u5DF2\u5B8C\u6210\uFF08\u5386\u53F2\u5F52\u7C7B\uFF09",
+  "board.pending": "\u5F85\u786E\u8BA4",
+  "project.search": "\u641C\u7D22\u9879\u76EE\u540D\u79F0",
+  "project.noMatches": "\u6CA1\u6709\u5339\u914D\u7684\u9879\u76EE",
   "workspace.more": "\u518D\u663E\u793A {{count}} \u4E2A\u4F1A\u8BDD",
   "workspace.attention": "\u9700\u8981\u4F60\u5904\u7406",
   "workspace.running": "\u6B63\u5728\u8FD0\u884C",
@@ -43276,7 +43284,7 @@ var zh_CN_default2 = {
   "session.unlinked": "\u672A\u5173\u8054 AI",
   "session.source": "\u6765\u6E90\uFF1A{{value}} \xB7 {{value2}} \xB7 {{event}}",
   "session.observeHint": "\u540C\u6B65 Codex \u6216\u542F\u7528 hooks \u540E\u53EF\u89C2\u5BDF\uFF1B\u4E1A\u52A1\u6267\u884C\u4E2D\u4E0D\u4EE3\u8868 AI \u6B63\u5728\u8FD0\u884C",
-  "board.unstarted": "\u672A\u5F00\u59CB",
+  "board.unstarted": "\u5F85\u5F00\u59CB",
   "board.executing": "\u8FDB\u884C\u4E2D",
   "board.waitingUser": "\u9700\u8981\u4F60\u5904\u7406",
   "board.completed": "\u5DF2\u5B8C\u6210",
@@ -43869,7 +43877,7 @@ import { join as join3 } from "node:path";
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.21",
+  version: "0.1.22",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",
@@ -44003,7 +44011,7 @@ server.registerTool("ai_todos_snapshot", { description: "Read persistent tasks, 
 }));
 server.registerTool("ai_todos_task", { description: "Read one task and its delivery/acceptance history. Use the returned revision for a subsequent mutation. Never replace a human-reviewed revision with a newer one.", inputSchema: external_exports.object({ id: external_exports.string().uuid() }), annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["model", "app"] } } }, guarded((args) => service("task", args)));
 server.registerTool("ai_todos_manage", {
-  description: "Create/update/delete task, inbox capture, project, objective, keyResult or plan. create_tasks atomically creates tasks and adds them to planDate. promote converts an inbox capture to a task, optionally adding it to planDate. daily_plan selects the union of tasks for one date; plans must contain every plan ID and revision actually read for that date. Creation/promotion requestId is a UUID generated once and reused on retries. Bind only an official API-synced or hook-observed session ID; transition defining \u2192 ready \u2192 executing; submit real delivery summary and absolute-path/HTTP(S) evidence; manage persisted focus/settings/reminders. All updates require the revision actually read. Description and acceptance criteria are optional. Stop is never delivery or acceptance. No complete/accept/reject operation is available to AI: people confirm completion or review submitted evidence in the UI. Do not infer acceptance, forge evidence or session IDs. Starting execution records intent and does not start Codex by itself.",
+  description: "Create/update/delete task, inbox capture, project, objective, keyResult or plan. create_tasks atomically creates tasks and adds them to planDate. promote converts an inbox capture to a task, optionally adding it to planDate. daily_plan selects the union of tasks for one date; plans must contain every plan ID and revision actually read for that date. Creation/promotion requestId is a UUID generated once and reused on retries. Bind only an official API-synced or hook-observed session ID; transition defining \u2192 ready \u2192 executing; submit real delivery summary and absolute-path/HTTP(S) evidence; manage persisted focus and settings. All updates require the revision actually read. Description and acceptance criteria are optional. Stop is never delivery or acceptance. No complete/accept/reject operation is available to AI: people confirm completion or review submitted evidence in the UI. Do not infer acceptance, forge evidence or session IDs. Starting execution records intent and does not start Codex by itself.",
   inputSchema: external_exports.object({ command: commandSchema }),
   annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   _meta: { ui: { visibility: ["model", "app"] } }

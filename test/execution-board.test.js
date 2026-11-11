@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtimeState, runtimeLabels, runtimeLabel, codexRuntimeState } from '../src/runtime.ts';
-import { executionColumnForTask, executionColumnForSession, taskStatus, taskNextStep, canConfirmAiSession, visibleExecutionSessions, boardDropDecision } from '../ui/execution-board.ts';
+import { boardColumns, executionColumnForTask, executionColumnForSession, taskStatus, taskNextStep, canConfirmAiSession, visibleExecutionSessions, boardDropDecision } from '../ui/execution-board.ts';
 import { taskSessionPrompt } from '../ui/codex-prompts.ts';
 
 const task = (state, ai) => ({ id: 'task', state, sessionId: ai?.id, ai });
@@ -60,7 +60,7 @@ test('Xinmo task stages combine business state and runtime instead of leaving st
   for (const state of ['waiting_input', 'waiting_approval', 'failed']) assert.equal(executionColumnForTask(task('executing', runtime(state))), 'waiting_user');
   for (const state of ['idle', 'completed']) assert.equal(executionColumnForTask(task('executing', runtime(state))), 'waiting_confirmation');
   assert.equal(executionColumnForTask(task('executing', runtime('unknown'))), 'unknown');
-  assert.equal(executionColumnForTask(task('executing', runtime('interrupted'))), 'ready');
+  assert.equal(executionColumnForTask(task('executing', runtime('interrupted'))), 'waiting_user');
   assert.equal(executionColumnForTask(task('defining', runtime('running'))), 'executing');
   assert.equal(executionColumnForTask(task('defining', { ...runtime('idle'), mode: 'planning' })), 'defining');
   assert.equal(executionColumnForTask(task('defining', { ...runtime('completed'), mode: 'planning', event: 'SessionEnd', turnId: null })), 'defining');
@@ -118,4 +118,26 @@ test('confirmation, represented sessions and post-acceptance activity match Xinm
   assert.deepEqual(boardDropDecision(task('awaiting_acceptance', ended), 'ready'), { action: 'request_changes' });
   assert.match(boardDropDecision(task('executing', runtime('waiting_input')), 'ready').reason, /审批或输入/);
   assert.match(boardDropDecision(owner, 'completed').reason, /不能通过拖拽/);
+});
+
+test('board has four workflow columns and keeps unknown sessions in pending without completing them', () => {
+  assert.deepEqual(boardColumns.map(c => c.id), ['unstarted', 'executing', 'waiting_confirmation', 'completed']);
+  const pending = boardColumns.find(c => c.id === 'waiting_confirmation');
+  for (const state of ['waiting_input', 'waiting_approval', 'failed', 'interrupted', 'idle', 'completed', 'unknown']) {
+    const session = runtime(state);
+    assert.ok(pending.stages.includes(executionColumnForSession(session)), state);
+    if (!['idle', 'completed'].includes(state)) assert.equal(canConfirmAiSession(session, []), false);
+  }
+  assert.ok(pending.stages.includes(executionColumnForTask(task('executing', runtime('unknown')))));
+});
+
+test('old catalog-only sessions are classified as historical completed, without confirming recent or stale active sessions', () => {
+  const now = Date.parse('2026-11-11T12:00:00Z');
+  const historical = { ...runtime('unknown'), observedState: 'unknown', source: 'codex-app-server', event: 'thread/list', catalogVisible: true, catalogUpdatedAt: '2026-11-09T12:00:00Z' };
+  assert.equal(executionColumnForSession(historical, now), 'completed');
+  assert.equal(canConfirmAiSession(historical, []), false);
+  assert.equal(executionColumnForSession({ ...historical, catalogUpdatedAt: '2026-11-11T11:59:00Z' }, now), 'unknown');
+  assert.equal(executionColumnForSession({ ...historical, observedState: 'running' }, now), 'waiting_user');
+  assert.equal(executionColumnForSession({ ...historical, state: 'running', observedState: 'running', source: 'codex-hook' }, now), 'executing');
+  assert.equal(executionColumnForSession({ ...historical, catalogUpdatedAt: undefined }, now), 'unknown');
 });

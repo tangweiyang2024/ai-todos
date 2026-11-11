@@ -1,4 +1,8 @@
 export default {
+  "session.historicalCompleted": "已完成（历史归类）",
+  "board.pending": "待确认",
+  "project.search": "搜索项目名称",
+  "project.noMatches": "没有匹配的项目",
   "workspace.more": "再显示 {{count}} 个会话",
   "workspace.attention": "需要你处理",
   "workspace.running": "正在运行",
@@ -127,7 +131,7 @@ export default {
   "session.unlinked": "未关联 AI",
   "session.source": "来源：{{value}} · {{value2}} · {{event}}",
   "session.observeHint": "同步 Codex 或启用 hooks 后可观察；业务执行中不代表 AI 正在运行",
-  "board.unstarted": "未开始",
+  "board.unstarted": "待开始",
   "board.executing": "进行中",
   "board.waitingUser": "需要你处理",
   "board.completed": "已完成",

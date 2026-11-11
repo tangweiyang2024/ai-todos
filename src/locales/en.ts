@@ -1,4 +1,8 @@
 export default {
+  "session.historicalCompleted": "Completed (historical)",
+  "board.pending": "Needs confirmation",
+  "project.search": "Search projects",
+  "project.noMatches": "No matching projects",
   "workspace.more": "Show {{count}} more sessions",
   "workspace.attention": "Needs your attention",
   "workspace.running": "Running",

@@ -440,25 +440,4 @@ export class Store {
       return session;
     });
   }
-  tick() {
-    return this.transaction(() => {
-      const s = this.settings(); const now = this.now();
-      const add = (key: string, title: string, taskId: string | null = null) => {
-        const notice = { id: randomUUID(), key, title, taskId, createdAt: this.at(), read: false };
-        if (!this.db.prepare('SELECT id FROM notices WHERE json_extract(body,\'$.key\')=?').get(key)) this.db.prepare('INSERT INTO notices VALUES (?,?)').run(notice.id, JSON.stringify(notice));
-      };
-      for (const t of this.all('task').filter(t => !['accepted', 'cancelled'].includes(t.state))) {
-        if (s.reminders && t.remindAt && Date.parse(t.remindAt) <= now) add(`reminder:${t.id}:${t.remindAt}`, `任务提醒：${t.title}`, t.id);
-        if (s.followUpMinutes && t.state === 'executing') {
-          const period = s.followUpMinutes * 60000;
-          const slot = Math.floor((now - Date.parse(t.updatedAt)) / period);
-          if (slot > 0) add(`follow:${t.id}:${t.updatedAt}:${slot}`, `进度跟进：${t.title}`, t.id);
-        }
-      }
-      if (s.reviewTime) {
-        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: s.timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(now)).map(p => [p.type, p.value]));
-        if (`${parts.hour}:${parts.minute}` >= s.reviewTime) add(`review:${s.timezone}:${parts.year}-${parts.month}-${parts.day}:${s.reviewTime}`, '每日复盘：回顾交付、专注时间与明日计划');
-      }
-    });
-  }
 }

@@ -4,7 +4,7 @@ import { i18n, getLocale, applyHostLocale, getLanguagePreference, setLanguagePre
 import type { LanguagePreference } from './i18n.ts';
 import type { TranslationKey, Locale } from '../src/i18n.ts';
 import type { ReactNode } from 'react';
-import type { Task, TaskDraft, Project, KeyResult, Plan, InboxItem, Entity, Kind, Snapshot, Settings as ReminderSettings, TaskEvent, DefinitionSuggestion, CaptureSuggestion, DefinitionField, Delivery as TaskDelivery, Session, CommandInput, TransitionState } from '../src/types.ts';
+import type { Task, TaskDraft, Project, KeyResult, Plan, InboxItem, Entity, Kind, Snapshot, TaskEvent, DefinitionSuggestion, CaptureSuggestion, DefinitionField, Delivery as TaskDelivery, Session, CommandInput, TransitionState } from '../src/types.ts';
 import type { Modal, Decision, FocusOperation, TaskCallbacks } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -14,10 +14,11 @@ import { DatePickerField, SelectField } from './components/FormControls.tsx';
 import { BoardView, ExecutionCard } from './components/ExecutionView.tsx';
 import { SessionHistory } from './components/SessionHistory.tsx';
 import { SessionList } from './components/SessionList.tsx';
+import { ProjectPicker } from './components/ProjectPicker.tsx';
 import { TaskEditor, EditorDialog, Field, ScheduleFields, Delivery } from './components/TaskEditor.tsx';
 import { TodayView, DailyPlanEditor, dayPlans } from './components/TodayView.tsx';
 import { InboxView } from './components/InboxView.tsx';
-import { clock, dateInput, fmt, hours, labels, localDay, parseSchedule, noticeTitle, number } from './format.ts';
+import { clock, dateInput, fmt, hours, labels, localDay, parseSchedule, number } from './format.ts';
 import { executionPrompt } from './codex-prompts.ts';
 import { visibleExecutionSessions, executionColumnForSession } from './execution-board.ts';
 import './xinmo.css';
@@ -111,15 +112,6 @@ function ReviewForm({ task, decision = 'accept', busy, onSave }: { task: Task; d
     <SelectField label={t("review.decision")} value={values.decision} disabled={busy} onValueChange={value => setValues(current => ({ ...current, decision: value as Decision }))} groups={[{ options: [{ value: 'accept', label: t("review.accept") }, { value: 'reject', label: t("review.reject") }] }]} />
     <Field label={t("review.note")} type="textarea" value={values.note} onChange={value => setValues(current => ({ ...current, note: value }))} required={values.decision === 'reject'} disabled={busy} />
     <label className="check-label"><input type="checkbox" checked={values.confirmed} onChange={event => setValues(current => ({ ...current, confirmed: event.target.checked }))} required disabled={busy} />{t("review.confirm")}</label></div><footer className="task-editor__actions"><button type="submit" className="primary" disabled={busy}>{t("review.record")}</button></footer>
-  </form>;
-}
-
-function SettingsForm({ settings, busy, onSave }: { settings: ReminderSettings; busy: boolean; onSave: (data: Omit<ReminderSettings, 'revision'>) => Promise<boolean> }) {
-  const { t } = useTranslation();
-  const [values, setValues] = useState({ ...settings, reviewTime: settings.reviewTime || '' });
-  return <form onSubmit={event => { event.preventDefault(); onSave({ reminders: values.reminders, followUpMinutes: Number(values.followUpMinutes), reviewTime: values.reviewTime || null, timezone: values.timezone }); }}><div className="task-editor__body">
-    <label className="check-label"><input type="checkbox" checked={values.reminders} disabled={busy} onChange={event => setValues(current => ({ ...current, reminders: event.target.checked }))} />{t("settings.enableReminders")}</label>
-    {([['followUpMinutes', t("settings.followUp"), 'number'], ['reviewTime', t("settings.reviewTime"), 'time'], ['timezone', t("settings.timezone"), 'text']] as const).map(([name, label, type]) => <Field key={name} label={label} type={type} value={values[name]} disabled={busy} onChange={value => setValues(current => ({ ...current, [name]: value }))} required={name !== 'reviewTime'} min={name === 'followUpMinutes' ? 0 : undefined} max={name === 'followUpMinutes' ? 10080 : undefined} />)}</div><footer className="task-editor__actions"><button type="submit" className="primary" disabled={busy}>{t("common.save")}</button></footer>
   </form>;
 }
 
@@ -279,13 +271,11 @@ function Workspace() {
     let stopped = false;
     let poll: ReturnType<typeof setTimeout> | undefined;
     let stopResizeNotifications: (() => void) | undefined;
-    let notified = new Set();
-    const pollState = async () => {
+      const pollState = async () => {
       try {
         if (Date.now() - lastThreadSync.current > 30000) { lastThreadSync.current = Date.now(); try { await syncThreads(); } catch (reason) { toast(t("session.syncFailed", { value: (reason instanceof Error ? reason.message : String(reason)) })); } }
         if (stopped) return;
-        const next = await refresh();
-        if (!stopped && !embedded && 'Notification' in window && Notification.permission === 'granted') next.notices.filter(notice => !notice.read && !notified.has(notice.id)).forEach(notice => { new Notification('ai-todos', { body: noticeTitle(notice) }); notified.add(notice.id); });
+        await refresh();
       } catch (reason) { if (!stopped) setConnectionError((reason instanceof Error ? reason.message : String(reason))); }
       finally { if (!stopped) poll = setTimeout(pollState, 5000); }
     };
@@ -305,7 +295,7 @@ function Workspace() {
           applyHostContext(bridge!.getHostContext());
         }
         if (stopped) return;
-        const next = await refresh(true); notified = new Set(next.notices.map(notice => notice.id));
+        await refresh(true);
         if (stopped) return;
         let projectsChanged = false;
         try { const result = await api('codex', { operation: 'sync_projects' }); projectsChanged = result.added > 0 || result.updated > 0; }
@@ -368,9 +358,6 @@ function Workspace() {
     } else if (modal.type === 'review') {
       modalTitle = t("review.title"); modalDescription = t("review.revisionHint", { revision: task.revision });
       modalBody = <ReviewForm task={task} decision={modal.decision} busy={busy} onSave={data => run(async () => { await api('review', { ticket: modal.ticket, id: task.id, revision: task.revision, ...data }); await refresh(true); }, t("review.recorded"), true)} />;
-    } else if (modal.type === 'settings') {
-      modalTitle = t("settings.reminders"); modalDescription = t("entity.settingsRevision", { value: modal.settings!.revision });
-      modalBody = <SettingsForm settings={modal.settings!} busy={busy} onSave={data => run(() => mutate({ action: 'settings', revision: modal.settings!.revision, data }), t("common.saved"), true)} />;
     } else if (modal.type === 'delete') {
       modalTitle = t("delete.title"); modalDescription = entity?.title ?? '';
       modalBody = <div className="editor-details"><p>{t("delete.hint")}</p><div className="actions"><button disabled={busy} onClick={() => setModal(null)}>{t("common.cancel")}</button><button className="danger" disabled={busy} onClick={() => run(() => mutate({ action: 'delete', kind: modal.kind!, id: entity.id, revision: entity.revision }), t("common.deleted"), true)}>{t("delete.title")}</button></div></div>;
@@ -406,7 +393,7 @@ function Workspace() {
     {view.page === 'work' && <section className={`execution-view ${view.mode === 'board' ? 'is-board' : ''}`}>
       {view.mode !== 'timeline' && <div className="execution-toolbar workspace-toolbar"><div className="segmented-control">{[['list', t('workspace.list')], ['board', t('board.mode')]].map(([mode, label]) => <button key={mode} className={view.mode === mode ? 'is-active' : ''} aria-pressed={view.mode === mode} onClick={() => setViewValue('mode', mode)}>{label}</button>)}</div>
         <label className="task-search"><Search size={14} aria-hidden="true" /><input type="search" aria-label={t('board.search')} placeholder={t('board.searchPlaceholder')} value={view.search} onChange={event => setViewValue('search', event.target.value)} /></label>
-        <SelectField label={t('entity.project')} value={view.project} onValueChange={value => setViewValue('project', value)} disabled={!snapshot.projects.length} groups={[{ options: [{ value: '', label: t('project.all') }, ...snapshot.projects.map(project => ({ value: project.id, label: project.title }))] }]} />
+        <ProjectPicker value={view.project} projects={snapshot.projects} onChange={value => setViewValue('project', value)} disabled={!snapshot.projects.length} />
       </div>}
       {threadTransport === 'history' && !snapshot.sessions.some(session => session.source === 'codex-hook') && <p className="note" role="status">{t('connection.hookSetup')}</p>}
       {view.mode === 'list' ? <SessionList tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenSession={openSession} onConfirmSession={confirmSession} onCompleteTask={completeTask} onReviewTask={review} onOpenCodex={openCodex} onHistory={() => setViewValue('mode', 'timeline')} /> : view.mode === 'board' ? <BoardView tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} onOpenSession={openSession} onConfirmSession={confirmSession} onReviewTask={review} onCompleteTask={completeTask} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenCodex={openCodex} onTransition={transition} onError={toast} /> : <SessionHistory sessions={historySessions} tasks={snapshot.tasks} onOpenSession={openSession} />}
@@ -416,7 +403,7 @@ function Workspace() {
       return <article className="card" key={project.id}><div className="row spaced"><h2>{project.title}</h2><button className="small" disabled={busy} onClick={() => openEntity('project', project)}>{t("common.edit")}</button></div>{project.codex && <p className="project-path">Codex · {project.codex.workspacePath}</p>}<p className="muted">{project.description || t("project.noDescription")}</p><div className="progress-track"><span style={{ width: `${tasks.length ? accepted / tasks.length * 100 : 0}%` }} /></div><div className="row spaced"><span className="muted">{t("project.acceptedCount", { accepted: accepted, count: tasks.length })}</span><button className="small" onClick={() => setView(current => ({ ...current, page: 'work', project: project.id }))}>{t("project.viewTasks")}</button></div></article>;
     })}{!snapshot.projects.length && <div className="empty-state"><strong>{t("project.organize")}</strong><span>{t("project.sharedTasks")}</span></div>}</div>}
     {view.page === 'plans' && <div className="list"><p className="muted">{t("plan.description")}</p>{[...snapshot.plans].sort((left, right) => right.date.localeCompare(left.date)).map(plan => <article className="card" key={plan.id}><div className="row spaced"><div><span className="muted">{plan.date}</span><h2>{plan.title}</h2></div><button className="small" disabled={busy} onClick={() => openEntity('plan', plan)}>{t("plan.edit")}</button></div><p className="muted">{plan.note}</p><div className="list">{plan.taskIds.map(id => <div className="row spaced" key={id}><button className="quiet" onClick={() => openTask(id)}>{findTask(id)?.title || t("task.deleted")}</button><span className="execution-status">{t(labels[findTask(id)?.state ?? ''] || 'common.unknown')}</span></div>)}{!plan.taskIds.length && <span className="muted">{t("plan.emptyTasks")}</span>}</div></article>)}{!snapshot.plans.length && <div className="empty-state"><strong>{t("plan.emptyTitle")}</strong><span>{t("plan.emptyHint")}</span></div>}</div>}
-    {view.page === 'settings' && <div className="grid settings-grid"><section className="card"><h2>{t('settings.language')}</h2><SelectField label={t('settings.language')} value={getLanguagePreference()} disabled={busy} onValueChange={value => { if (!setLanguagePreference(value as LanguagePreference)) toast(t('settings.languageStorageFailed')); }} groups={[{ options: [{ value: 'auto', label: t('settings.followSystem') }, ...Object.entries(languages).map(([value, { name }]) => ({ value, label: name }))] }]} /><p className="note">{t('settings.languageHint')}</p></section><section className="card"><div className="row spaced"><h2>{t("settings.reminders")}</h2><button className="small" disabled={busy} onClick={() => open({ type: 'settings', settings: { ...snapshot.settings } })}>{t("settings.editReminders")}</button></div><p className="muted">{t("settings.reminderLabel")}{snapshot.settings.reminders ? t("common.on") : t("common.off")}<br />{t("settings.followUpLabel")}{snapshot.settings.followUpMinutes ? t("settings.followUpMinutes", { followUpMinutes: snapshot.settings.followUpMinutes, count: snapshot.settings.followUpMinutes }) : t("common.off")}<br />{t("settings.reviewLabel")}{snapshot.settings.reviewTime || t("common.off")}<br />{t("settings.timezoneLabel")}{snapshot.settings.timezone}</p>{!embedded && <button className="small" onClick={() => run(async () => { if (!('Notification' in window)) throw new Error(t("settings.notificationsUnsupported")); const permission = await Notification.requestPermission(); toast(permission === 'granted' ? t("settings.notificationsAllowed") : t("settings.notificationsDenied")); })}>{t("settings.allowNotifications")}</button>}<p className="note">{t("settings.schedulerHint")}</p></section><section className="card"><h2>{t("notices.title")}</h2><p className="muted">{t("notices.unreadCount", { count: snapshot.notices.filter(notice => !notice.read).length })}</p><div className="list">{snapshot.notices.map(notice => <article className={`notice ${notice.read ? 'read' : ''}`} key={notice.id}><div className="row spaced"><h3>{noticeTitle(notice)}</h3>{!notice.read ? <button className="small" disabled={busy} onClick={() => run(() => mutate({ action: 'ack', id: notice.id }))}>{t("notices.read")}</button> : <span className="muted">{t("notices.read")}</span>}</div><p className="muted">{fmt(notice.createdAt)}</p><button className="small" onClick={() => notice.taskId ? openTask(notice.taskId) : setViewValue('page', 'today')}>{notice.taskId ? t("task.open") : t("notices.viewToday")}</button></article>)}{!snapshot.notices.length && <span className="muted">{t("notices.empty")}</span>}</div></section></div>}
+    {view.page === 'settings' && <div className="grid settings-grid"><section className="card"><h2>{t('settings.language')}</h2><SelectField label={t('settings.language')} value={getLanguagePreference()} disabled={busy} onValueChange={value => { if (!setLanguagePreference(value as LanguagePreference)) toast(t('settings.languageStorageFailed')); }} groups={[{ options: [{ value: 'auto', label: t('settings.followSystem') }, ...Object.entries(languages).map(([value, { name }]) => ({ value, label: name }))] }]} /><p className="note">{t('settings.languageHint')}</p></section></div>}
   </main></div>
 
     {modal && <EditorDialog key={modal.key} title={modalTitle} description={modalDescription} busy={busy} error={error} onClose={() => setModal(modal.returnTo || null)}>{modalBody}</EditorDialog>}

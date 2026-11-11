@@ -230,13 +230,11 @@ test('focus survives process restart, pause/resume excludes pause, stale clicks 
   assert.throws(() => s.command({ action: 'delete', kind: 'task', id: task.id, revision: task.revision }), /保留/);
 });
 
-test('scheduler persists reminders, follow-up and review, deduplicates and catches up after downtime', t => {
-  const { store: s, advance } = fixture(t); let task = create(s, 'task', { title: '跟进', criteria: '交付', remindAt: '2026-10-10T00:01:00Z' });
-  s.command({ action: 'settings', revision: 0, data: { reminders: true, followUpMinutes: 1, reviewTime: '08:01', timezone: 'Asia/Shanghai' } });
-  task = transition(s, task, 'ready'); task = transition(s, task, 'executing');
-  s.tick(); assert.equal(s.snapshot().notices.length, 0);
-  advance(120000); s.tick(); assert.equal(s.snapshot().notices.length, 3);
-  s.tick(); assert.equal(s.snapshot().notices.length, 3);
-  const notice = s.snapshot().notices[0]; s.command({ action: 'ack', id: notice.id }); assert.equal(s.snapshot().notices[0].read, true);
-  advance(60000); s.tick(); assert.equal(s.snapshot().notices.length, 4);
+test('legacy reminder records remain readable and can be acknowledged', t => {
+  const { store: s } = fixture(t);
+  const notice = { id: randomUUID(), key: 'legacy', title: '旧提醒', taskId: null, createdAt: s.at(), read: false };
+  s.db.prepare('INSERT INTO notices VALUES (?,?)').run(notice.id, JSON.stringify(notice));
+  assert.equal(s.snapshot().notices[0].id, notice.id);
+  s.command({ action: 'ack', id: notice.id });
+  assert.equal(s.snapshot().notices[0].read, true);
 });

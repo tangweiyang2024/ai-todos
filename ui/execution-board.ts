@@ -7,12 +7,10 @@ import { runtimeState } from '../src/runtime.ts';
 import { labels, runtimeLabel } from './format.ts';
 
 export const boardColumns: { id: string; label: TranslationKey; stages: string[]; dropTarget: string }[] = [
-  { id: 'waiting_user', label: 'board.waitingUser', stages: ['waiting_user'], dropTarget: 'waiting_user' },
-  { id: 'waiting_confirmation', label: 'activity.pending', stages: ['waiting_confirmation'], dropTarget: 'waiting_confirmation' },
-  { id: 'executing', label: 'board.executing', stages: ['executing'], dropTarget: 'executing' },
-  { id: 'completed', label: 'board.completed', stages: ['completed'], dropTarget: 'completed' },
-  { id: 'unknown', label: 'runtime.unknown', stages: ['unknown'], dropTarget: 'unknown' },
   { id: 'unstarted', label: 'board.unstarted', stages: ['defining', 'ready', 'changes_requested'], dropTarget: 'ready' },
+  { id: 'executing', label: 'board.executing', stages: ['executing'], dropTarget: 'executing' },
+  { id: 'waiting_confirmation', label: 'board.pending', stages: ['waiting_user', 'waiting_confirmation', 'unknown'], dropTarget: 'waiting_confirmation' },
+  { id: 'completed', label: 'board.completed', stages: ['completed'], dropTarget: 'completed' },
 ];
 export function executionColumnForTask(task: Pick<Task, 'state' | 'ai'>, runtime = task.ai) {
   if (task.state === 'cancelled') return 'cancelled';
@@ -28,9 +26,9 @@ export function executionColumnForTask(task: Pick<Task, 'state' | 'ai'>, runtime
     if (['queued', 'running'].includes(state)) return 'executing';
     if (['waiting_approval', 'waiting_input', 'failed'].includes(state)) return 'waiting_user';
     if (['idle', 'completed'].includes(state) && (runtime.turnId || runtime.event === 'Stop')) return 'waiting_confirmation';
-    if (state === 'interrupted') return 'ready';
+    if (state === 'interrupted') return 'waiting_user';
     if (['completed', 'idle'].includes(state) && task.state === 'executing') return 'waiting_confirmation';
-    if (state === 'unknown' && task.state === 'executing') return 'unknown';
+    if (state === 'unknown') return 'unknown';
   }
   return task.state;
 }
@@ -61,9 +59,16 @@ export function taskNextStep(task: Pick<Task, 'state' | 'ai' | 'sessionId'>): { 
   }
   return { action: 'complete', label: 'session.confirm', hint: 'task.nextComplete' };
 }
-export function executionColumnForSession(session: Pick<LiveSession, 'state' | 'confirmedAt'> & Partial<Pick<LiveSession, 'observedState'>>) {
+export function isHistoricalSession(session: Pick<LiveSession, 'state'> & Partial<Pick<LiveSession, 'observedState' | 'source' | 'event' | 'catalogVisible' | 'catalogUpdatedAt'>>, now = Date.now()) {
+  const updated = Date.parse(session.catalogUpdatedAt ?? '');
+  return runtimeState(session.state) === 'unknown' && runtimeState(session.observedState) === 'unknown'
+    && session.source === 'codex-app-server' && session.event === 'thread/list' && session.catalogVisible === true
+    && Number.isFinite(updated) && now - updated >= 24 * 60 * 60 * 1000;
+}
+export function executionColumnForSession(session: Pick<LiveSession, 'state' | 'confirmedAt'> & Partial<Pick<LiveSession, 'observedState' | 'source' | 'event' | 'catalogVisible' | 'catalogUpdatedAt'>>, now = Date.now()) {
   const state = runtimeState(session.state);
   if (state === 'running' || state === 'queued') return 'executing';
+  if (isHistoricalSession(session, now)) return 'completed';
   if (session.confirmedAt && ['idle', 'completed'].includes(state)) return 'completed';
   if (['idle', 'completed'].includes(state)) return 'waiting_confirmation';
   if (['waiting_input', 'waiting_approval', 'failed', 'interrupted'].includes(state)) return 'waiting_user';

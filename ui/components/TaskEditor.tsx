@@ -86,7 +86,6 @@ export function TaskEditor({ task = {}, history = [], snapshot, busy, onSave, on
         <div className="editor-field-pair"><SelectField label={t("entity.project")} value={values.projectId} onValueChange={value => setValue('projectId', value)} disabled={disabled} groups={groups([['', t("project.none")], ...snapshot.projects.map(project => [project.id, `${project.title}${project.codex ? ' · Codex' : ''}`])])} /></div>
         {selectedProject?.codex && <p className="project-path">{selectedProject.codex.workspacePath}</p>}
         <button type="button" className="text-button" disabled={busy} onClick={onSyncProjects}>{t("project.sync")}</button>
-        <DatePickerField label={t("schedule.reminder")} type="datetime-local" value={values.remindAt} onValueChange={value => setValue('remindAt', value)} disabled={disabled} />
       </div></details>
       {!editable && <p className="note">{t("task.lockedHint")}</p>}
     {!creating && <div className="editor-details">

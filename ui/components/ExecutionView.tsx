@@ -9,7 +9,7 @@ import { useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { fmt, labels, priorityLabels, runtimeLabel } from '../format.ts';
 import { runtimeState } from '../../src/runtime.ts';
-import { boardColumns, executionColumnForTask, executionColumnForSession as sessionColumn, taskStatus, taskNextStep, canConfirmAiSession, boardDropDecision } from '../execution-board.ts';
+import { boardColumns, executionColumnForTask, executionColumnForSession as sessionColumn, taskStatus, taskNextStep, canConfirmAiSession, boardDropDecision, isHistoricalSession } from '../execution-board.ts';
 import { tasksInTimelineWindow, tasksOutsideTimelineWindow, timelineAxisColumnWidths, timelineWindowForTasks } from '../timeline-window.ts';
 export { boardColumns, sessionColumn };
 
@@ -80,7 +80,7 @@ function SessionCard({ session, tasks, projects, busy, onOpenSession, onConfirmS
     <button type="button" className="execution-card__summary" aria-expanded={expanded} aria-controls={`execution-session-${session.id}`} onClick={() => setExpanded(value => !value)}><strong title={title}>{title}</strong><ChevronDown size={14} /></button>
     {session.preview && <p className="execution-card__preview">{session.preview}</p>}
     <small className="execution-card__activity">{t("card.lastActivity", { at: fmt(lastActivity(session, session.observedAt)) })}</small>
-    <div className="execution-card__primary execution-card__actions"><span className={`execution-status status-${completed ? 'accepted' : runtimeState(session.state)}`}>{completed ? t("board.completed") : sessionColumn(session) === 'waiting_confirmation' ? t("activity.pending") : runtimeLabel(session)}</span><div className="execution-card__buttons"><button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={12} />{t("session.open")}</button>{canConfirm && onConfirmSession && <button type="button" disabled={busy} onClick={() => onConfirmSession(session)}><Check size={12} />{t("session.confirm")}</button>}</div></div>
+    <div className="execution-card__primary execution-card__actions"><span className={`execution-status status-${completed ? 'accepted' : runtimeState(session.state)}`}>{isHistoricalSession(session) ? t("session.historicalCompleted") : completed ? t("board.completed") : sessionColumn(session) === 'waiting_confirmation' ? t("activity.pending") : runtimeLabel(session)}</span><div className="execution-card__buttons"><button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={12} />{t("session.open")}</button>{canConfirm && onConfirmSession && <button type="button" disabled={busy} onClick={() => onConfirmSession(session)}><Check size={12} />{t("session.confirm")}</button>}</div></div>
     <div id={`execution-session-${session.id}`} className="execution-card__content" hidden={!expanded}><div className="execution-card__body">
       <div className="execution-card__topline"><span className="execution-session-card__source" title={session.cwd}><Code2 size={11} aria-hidden="true" /><span>Codex{workspace ? ` · ${workspace}` : ''}</span></span><span>{fmt(session.catalogUpdatedAt || session.observedAt)}</span></div>
       {(session.confirmationHistory ?? (session.confirmedAt ? [{ at: session.confirmedAt }] : [])).map((entry, index) => <small key={`${entry.at}-${index}`}>{t("session.confirmedAt", { at: fmt(entry.at) })}</small>)}
@@ -129,14 +129,13 @@ export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, bu
     onDragStart={(event, value) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/ai-todos-session', JSON.stringify({ id: value.id, observedAt: value.observedAt, event: value.event, turnId: value.turnId, catalogUpdatedAt: value.catalogUpdatedAt })); }} onDragEnd={endDrag} />;
   const completedItems = [
     ...tasks.filter(task => executionColumnForTask(task) === 'completed').map(task => ({ kind: 'task' as const, value: task, at: task.review?.at || task.updatedAt })),
-    ...sessions.filter(session => sessionColumn(session) === 'completed').map(session => ({ kind: 'session' as const, value: session, at: session.confirmedAt })),
+    ...sessions.filter(session => sessionColumn(session) === 'completed').map(session => ({ kind: 'session' as const, value: session, at: session.confirmedAt || session.catalogUpdatedAt || session.observedAt })),
   ].sort((left, right) => (Date.parse(right.at ?? '') || 0) - (Date.parse(left.at ?? '') || 0));
   return <><div className="execution-board" aria-label={t("board.label")} tabIndex={0}>
     {boardColumns.map(column => {
       const items = tasks.filter(task => column.stages.includes(executionColumnForTask(task)));
-      const sessionItems = sessions.filter(session => sessionColumn(session) === column.id);
+      const sessionItems = sessions.filter(session => column.stages.includes(sessionColumn(session)));
       const completed = column.id === 'completed';
-      if (['unknown', 'unstarted'].includes(column.id) && !items.length && !sessionItems.length) return null;
       if (completed) items.sort((left, right) => (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0));
       return <section className={`execution-column column-${column.id} ${dropTarget === column.id ? 'is-drop-target' : ''}`} key={column.id} aria-labelledby={`execution-column-${column.id}`}
         onDragOver={event => { if (!busy && (event.dataTransfer.types.includes('application/ai-todos') || (column.id === 'completed' && event.dataTransfer.types.includes('application/ai-todos-session')))) { event.preventDefault(); setDropTarget(column.id); } }}

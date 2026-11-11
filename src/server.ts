@@ -88,7 +88,6 @@ const server = createServer(async (req, res) => {
   } catch (error) { send(res, error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 400, errorPayload(error)); }
 });
 const timer = setInterval(() => {
-  try { store.tick(); } catch (error) { console.error('Reminder scheduler:', error instanceof Error ? error.message : String(error)); }
   for (const [key, value] of sessions) if (value.expires < Date.now()) sessions.delete(key);
   for (const [key, value] of reviews) if (value.expires < Date.now()) reviews.delete(key);
 }, 15000);
@@ -97,7 +96,7 @@ server.listen(port, '127.0.0.1', () => {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   writeFileSync(runtimePath, JSON.stringify({ pid: process.pid, origin, token }), { mode: 0o600 });
   chmodSync(runtimePath, 0o600);
-  store.tick(); console.error(`ai-todos listening at ${origin}`);
+  console.error(`ai-todos listening at ${origin}`);
 });
 function shutdown() {
   clearInterval(timer);

@@ -22,7 +22,7 @@ var origin = `http://127.0.0.1:${port}`;
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.21",
+  version: "0.1.22",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",
@@ -2349,6 +2349,10 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default = {
+  "session.historicalCompleted": "Completed (historical)",
+  "board.pending": "Needs confirmation",
+  "project.search": "Search projects",
+  "project.noMatches": "No matching projects",
   "workspace.more": "Show {{count}} more sessions",
   "workspace.attention": "Needs your attention",
   "workspace.running": "Running",
@@ -2964,6 +2968,10 @@ var en_default = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default = {
+  "session.historicalCompleted": "\u5DF2\u5B8C\u6210\uFF08\u5386\u53F2\u5F52\u7C7B\uFF09",
+  "board.pending": "\u5F85\u786E\u8BA4",
+  "project.search": "\u641C\u7D22\u9879\u76EE\u540D\u79F0",
+  "project.noMatches": "\u6CA1\u6709\u5339\u914D\u7684\u9879\u76EE",
   "workspace.more": "\u518D\u663E\u793A {{count}} \u4E2A\u4F1A\u8BDD",
   "workspace.attention": "\u9700\u8981\u4F60\u5904\u7406",
   "workspace.running": "\u6B63\u5728\u8FD0\u884C",
@@ -3092,7 +3100,7 @@ var zh_CN_default = {
   "session.unlinked": "\u672A\u5173\u8054 AI",
   "session.source": "\u6765\u6E90\uFF1A{{value}} \xB7 {{value2}} \xB7 {{event}}",
   "session.observeHint": "\u540C\u6B65 Codex \u6216\u542F\u7528 hooks \u540E\u53EF\u89C2\u5BDF\uFF1B\u4E1A\u52A1\u6267\u884C\u4E2D\u4E0D\u4EE3\u8868 AI \u6B63\u5728\u8FD0\u884C",
-  "board.unstarted": "\u672A\u5F00\u59CB",
+  "board.unstarted": "\u5F85\u5F00\u59CB",
   "board.executing": "\u8FDB\u884C\u4E2D",
   "board.waitingUser": "\u9700\u8981\u4F60\u5904\u7406",
   "board.completed": "\u5DF2\u5B8C\u6210",

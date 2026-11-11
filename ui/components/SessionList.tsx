@@ -4,7 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import type { LiveSession, Project, Task } from '../../src/types.ts';
 import type { TaskCallbacks } from '../types.ts';
 import { fmt, runtimeLabel } from '../format.ts';
-import { canConfirmAiSession, executionColumnForSession, taskNextStep, taskStatus } from '../execution-board.ts';
+import { canConfirmAiSession, executionColumnForSession, isHistoricalSession, taskNextStep, taskStatus } from '../execution-board.ts';
 import { groupSessionItems } from '../session-list.ts';
 
 interface Props extends Pick<TaskCallbacks, 'onOpenTask' | 'onOpenSession' | 'onConfirmSession' | 'onCompleteTask' | 'onReviewTask' | 'onOpenCodex'> {
@@ -14,7 +14,7 @@ export function SessionList({ tasks, allTasks, sessions, projects, busy, onOpenT
   const { t } = useTranslation();
   const groups = groupSessionItems(tasks, sessions);
   const [limits, setLimits] = useState<Record<string, number>>({});
-  const headings = { attention: 'workspace.attention', running: 'workspace.running', done: 'workspace.confirmed', unknown: 'runtime.unknown', unstarted: 'board.unstarted' } as const;
+  const headings = { unstarted: 'board.unstarted', running: 'workspace.running', attention: 'board.pending', done: 'workspace.confirmed' } as const;
   return <div className="session-list">{(Object.keys(headings) as (keyof typeof headings)[]).map(group => groups[group].length > 0 && <section key={group} className="session-list__group">
     <h2>{t(headings[group])} <span>{t('workspace.sessionCount', { count: groups[group].length })}</span></h2>
     {groups[group].slice(0, limits[group] || 30).map(item => {
@@ -25,13 +25,14 @@ export function SessionList({ tasks, allTasks, sessions, projects, busy, onOpenT
       const project = projects.find(p => task?.projectId ? p.id === task.projectId : p.codex?.workspacePath === session?.cwd)?.title || session?.cwd?.split(/[\\/]/).pop() || t('project.none');
       const next = task ? taskNextStep(task) : null;
       const completed = task ? task.state === 'accepted' : session && executionColumnForSession(session) === 'completed';
-      const status = task ? taskStatus(task) : completed ? t('board.completed') : session && executionColumnForSession(session) === 'waiting_confirmation' ? t('activity.pending') : runtimeLabel(session) || t('runtime.unknown');
+      const historical = !task && session && isHistoricalSession(session);
+      const status = task ? taskStatus(task) : historical ? t('session.historicalCompleted') : completed ? t('board.completed') : session && executionColumnForSession(session) === 'waiting_confirmation' ? t('activity.pending') : runtimeLabel(session) || t('runtime.unknown');
       const canConfirm = !task && session && canConfirmAiSession(session, allTasks);
       return <article className={`session-list__card ${group === 'attention' ? 'is-attention' : ''}`} key={`${item.kind}-${item.id}`}>
         <span className={`session-list__dot is-${group}`} aria-hidden="true" />
         <div className="session-list__content"><div className="session-list__top"><strong>{title}</strong><span className={`session-list__status is-${group}`}>{status}</span></div>
           {description && <p className="session-list__description">{description}</p>}
-          <div className="session-list__meta"><span>{project}</span><span>·</span><span>{completed ? t('session.confirmedAt', { at: fmt(task?.review?.at || session?.confirmedAt || item.at) }) : t('card.lastActivity', { at: fmt(item.at) })}</span>{session && !completed && <><span>·</span><span>{t(session.source === 'codex-hook' ? 'workspace.hook' : session.source === 'codex-rollout' ? 'workspace.historySource' : 'workspace.hostSource')}</span></>}</div>
+          <div className="session-list__meta"><span>{project}</span><span>·</span><span>{completed && !historical ? t('session.confirmedAt', { at: fmt(task?.review?.at || session?.confirmedAt || item.at) }) : t('card.lastActivity', { at: fmt(item.at) })}</span>{session && !completed && <><span>·</span><span>{t(session.source === 'codex-hook' ? 'workspace.hook' : session.source === 'codex-rollout' ? 'workspace.historySource' : 'workspace.hostSource')}</span></>}</div>
         </div>
         <div className="session-list__actions">
           {session && <button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={13} />{t('session.open')}</button>}
