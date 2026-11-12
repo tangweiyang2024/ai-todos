@@ -141,3 +141,11 @@ test('old catalog-only sessions are classified as historical completed, without 
   assert.equal(executionColumnForSession({ ...historical, state: 'running', observedState: 'running', source: 'codex-hook' }, now), 'executing');
   assert.equal(executionColumnForSession({ ...historical, catalogUpdatedAt: undefined }, now), 'unknown');
 });
+
+test('older rollout activity stays in progress while clearly marked as last observed', () => {
+  const session = { ...runtime('running'), stateConfidence: 'last_observed', source: 'codex-rollout' };
+  assert.equal(executionColumnForSession(session), 'executing');
+  assert.equal(runtimeLabel(session), '上次观察：执行中');
+  assert.equal(taskStatus(task('executing', session)), '上次观察：执行中');
+  assert.equal(canConfirmAiSession(session, []), false);
+});

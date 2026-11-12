@@ -1,4 +1,5 @@
 export default {
+  "runtime.lastObservedRunning": "上次观察：执行中",
   "session.historicalCompleted": "已完成（历史归类）",
   "board.pending": "待确认",
   "project.search": "搜索项目名称",

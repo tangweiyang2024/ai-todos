@@ -11,8 +11,9 @@ const planningLabels: Record<string, TranslationKey> = {
   queued: "runtime.planningQueued", running: "runtime.planningRunning", waiting_approval: "runtime.planningApproval", waiting_input: "runtime.planningInput",
   interrupted: "runtime.planningInterrupted", failed: "runtime.planningFailed", completed: "runtime.pendingConfirmation", idle: "runtime.pendingConfirmation", unknown: "runtime.unknown",
 };
-export function runtimeLabel(runtime?: { state?: string; mode?: string } | null) {
+export function runtimeLabel(runtime?: { state?: string; mode?: string; stateConfidence?: string } | null) {
   if (!runtime) return undefined;
+  if (runtime.stateConfidence === 'last_observed' && runtimeState(runtime.state) === 'running') return i18n.t('runtime.lastObservedRunning');
   const key = (runtime.mode === 'planning' ? planningLabels : runtimeLabels)[runtimeState(runtime.state)];
   return key ? i18n.t(key) : undefined;
 }

@@ -16,7 +16,7 @@ export interface Session {
   turnId?: string | null; source: string; title?: string; preview?: string;
   codexProjectId?: string | null; catalogUpdatedAt?: string; catalogVisible?: boolean; confirmedAt?: string; confirmationHistory?: SessionConfirmation[]; activityHistory?: SessionActivity[];
 }
-export type LiveSession = Session & { state: string; mode?: 'planning' | 'execution' };
+export type LiveSession = Session & { state: string; stateConfidence?: 'last_observed'; mode?: 'planning' | 'execution' };
 export type Task = EntityData<'task'> & EntityMeta & {
   state: TaskState; sessionId: string | null; ai?: LiveSession | null; delivery?: Delivery; review?: Review;
   capture?: { id: string; title: string; capturedAt: string };

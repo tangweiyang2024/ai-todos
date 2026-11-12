@@ -1,6 +1,6 @@
 {
   "name": "ai-todos",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "独立本地任务、项目、OKR、计划、交付验收与专注工作台",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",

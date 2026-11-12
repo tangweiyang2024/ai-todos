@@ -25686,6 +25686,7 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default2 = {
+  "runtime.lastObservedRunning": "Last observed: running",
   "session.historicalCompleted": "Completed (historical)",
   "board.pending": "Needs confirmation",
   "project.search": "Search projects",
@@ -26305,6 +26306,7 @@ var en_default2 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "runtime.lastObservedRunning": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u6267\u884C\u4E2D",
   "session.historicalCompleted": "\u5DF2\u5B8C\u6210\uFF08\u5386\u53F2\u5F52\u7C7B\uFF09",
   "board.pending": "\u5F85\u786E\u8BA4",
   "project.search": "\u641C\u7D22\u9879\u76EE\u540D\u79F0",
@@ -27093,7 +27095,10 @@ var Store = class {
     return this.db.prepare("SELECT body FROM sessions ORDER BY rowid DESC").all().map((r) => {
       const s = JSON.parse(r.body);
       const state = runtimeState(s.observedState);
-      return { ...s, state: ["queued", "running", "waiting_approval", "waiting_input"].includes(state) && this.now() - Date.parse(s.observedAt) > 3e5 ? "unknown" : state };
+      const age = this.now() - Date.parse(s.observedAt);
+      const extendedRunning = state === "running" && s.source === "codex-rollout" && s.event === "task_started";
+      const expired = ["queued", "running", "waiting_approval", "waiting_input"].includes(state) && age > (extendedRunning ? 18e5 : 3e5);
+      return { ...s, state: expired ? "unknown" : state, ...!expired && extendedRunning && age > 3e5 ? { stateConfidence: "last_observed" } : {} };
     });
   }
   snapshot() {
@@ -27185,7 +27190,7 @@ var Store = class {
   syncCodexThreads(threads, complete = true) {
     return this.transaction(() => {
       const existing = new Map(this.sessions().map((session) => {
-        const { state, ...stored } = session;
+        const { state, stateConfidence, ...stored } = session;
         return [session.id, preserveConfirmation(stored)];
       }));
       const seen = /* @__PURE__ */ new Set();
@@ -27676,17 +27681,54 @@ async function rolloutObservation(thread, trackedActive) {
   if (thread.status.type !== "notLoaded" || !thread.path || !trackedActive && Date.now() - thread.updatedAt * 1e3 > 3e5) return;
   const input2 = createReadStream(thread.path), lines = createInterface({ input: input2, crlfDelay: Infinity });
   let matched = false, latestAt = "", observation;
+  const questions = /* @__PURE__ */ new Map();
   try {
     for await (const line of lines) {
       try {
         const timestamp = line.match(/^\{"timestamp"\s*:\s*"([^"]+)"/)?.[1];
         if (!timestamp || !Number.isFinite(Date.parse(timestamp))) continue;
-        if (!latestAt || Date.parse(timestamp) > Date.parse(latestAt)) latestAt = timestamp;
-        if (!/"type"\s*:\s*"(session_meta|task_started|task_complete|turn_aborted)"/.test(line)) continue;
+        if (!/"type"\s*:\s*"(token_count|token_usage_record)"/.test(line) && (!latestAt || Date.parse(timestamp) > Date.parse(latestAt))) latestAt = timestamp;
+        const lifecycle = /"type"\s*:\s*"(session_meta|task_started|task_complete|turn_aborted)"/.test(line);
+        const request = line.includes("request_user_input_async") && /"type"\s*:\s*"function_call"/.test(line);
+        const result = questions.size > 0 && /"type"\s*:\s*"function_call_output"/.test(line) && [...questions.keys()].some((id2) => line.includes(JSON.stringify(id2)));
+        const reply = questions.size > 0 && line.includes("send_user_message_question_reply");
+        if (!lifecycle && !request && !result && !reply) continue;
         const record2 = JSON.parse(line);
         if (record2.type === "session_meta") {
           if (record2.payload?.id !== thread.id) return;
           matched = true;
+        }
+        if (record2.type === "response_item") {
+          const payload = record2.payload;
+          if (payload?.type === "function_call" && payload.name === "request_user_input_async" && typeof payload.call_id === "string") {
+            try {
+              const args = JSON.parse(payload.arguments);
+              const count = Array.isArray(args.questions) ? args.questions.length : 0;
+              if (count > 0 && count <= 100) questions.set(payload.call_id, { at: timestamp, turnId: payload.internal_chat_message_metadata_passthrough?.turn_id ?? observation?.turnId ?? null, accepted: false, unanswered: new Set(Array.from({ length: count }, (_, index) => index)) });
+            } catch {
+            }
+          } else if (payload?.type === "function_call_output" && questions.has(payload.call_id)) {
+            try {
+              questions.get(payload.call_id).accepted = JSON.parse(payload.output)?.accepted === true;
+            } catch {
+            }
+          } else if (payload?.type === "message" && payload.role === "user" && Array.isArray(payload.content)) {
+            for (const part of payload.content) {
+              if (typeof part?.text !== "string") continue;
+              for (const reply2 of part.text.matchAll(/<send_user_message_question_reply>\s*([\s\S]*?)\s*<\/send_user_message_question_reply>/g)) {
+                try {
+                  const answers = JSON.parse(reply2[1]);
+                  if (!Array.isArray(answers)) continue;
+                  for (const answer of answers) {
+                    const key = JSON.parse(answer.questionItemId);
+                    if (Array.isArray(key) && key[0] === "request_user_input_async" && typeof key[1] === "string" && Number.isInteger(key[2])) questions.get(key[1])?.unanswered.delete(key[2]);
+                  }
+                } catch {
+                }
+              }
+            }
+          }
+          continue;
         }
         if (record2.type !== "event_msg") continue;
         const state = { task_started: "running", task_complete: "idle", turn_aborted: "interrupted" }[record2.payload?.type];
@@ -27695,6 +27737,8 @@ async function rolloutObservation(thread, trackedActive) {
       } catch {
       }
     }
+    const pending = [...questions.values()].filter((question) => question.accepted && question.unanswered.size > 0).at(-1);
+    if (matched && pending) return { state: "waiting_input", observedAt: pending.at, event: "request_user_input_async", source: "codex-rollout", turnId: pending.turnId };
     if (matched && observation) return { ...observation, observedAt: observation.state === "running" ? latestAt : observation.observedAt };
   } catch {
   } finally {
@@ -27715,6 +27759,7 @@ async function listThreads(store2) {
         const preview = (requestIndex >= 0 ? thread.preview.slice(requestIndex + "## My request:".length) : thread.preview).trim();
         const title = (thread.name?.trim() || preview.replace(/\s+/g, " ") || `Codex \xB7 ${basename(thread.cwd)} \xB7 ${thread.id.slice(-8)}`).slice(0, 300);
         const observation = await rolloutObservation(thread, trackedActive.has(thread.id));
+        if (observation?.event === "request_user_input_async") observation.observedAt = store2.at();
         const state = observation?.state ?? codexRuntimeState(thread.status);
         threads.push({ id: thread.id, title, preview: preview.slice(0, 2e4), cwd: normalize(thread.cwd), projectId: thread.projectId ?? null, updatedAt: new Date(thread.updatedAt * 1e3).toISOString(), state, ...observation ? { observation } : {} });
       }
@@ -27788,7 +27833,7 @@ async function codexAction(store2, raw) {
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.22",
+  version: "0.1.23",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",

@@ -127,7 +127,10 @@ export class Store {
     return this.db.prepare('SELECT body FROM sessions ORDER BY rowid DESC').all().map(r => {
       const s = JSON.parse(r.body as string) as Session;
       const state = runtimeState(s.observedState);
-      return { ...s, state: ['queued', 'running', 'waiting_approval', 'waiting_input'].includes(state) && this.now() - Date.parse(s.observedAt) > 300000 ? 'unknown' : state };
+      const age = this.now() - Date.parse(s.observedAt);
+      const extendedRunning = state === 'running' && s.source === 'codex-rollout' && s.event === 'task_started';
+      const expired = ['queued', 'running', 'waiting_approval', 'waiting_input'].includes(state) && age > (extendedRunning ? 1800000 : 300000);
+      return { ...s, state: expired ? 'unknown' : state, ...(!expired && extendedRunning && age > 300000 ? { stateConfidence: 'last_observed' as const } : {}) };
     });
   }
   snapshot(): Snapshot {
@@ -205,7 +208,7 @@ export class Store {
   }
   syncCodexThreads(threads: CodexThread[], complete = true) {
     return this.transaction(() => {
-      const existing = new Map(this.sessions().map(session => { const { state, ...stored } = session; return [session.id, preserveConfirmation(stored)]; }));
+      const existing = new Map(this.sessions().map(session => { const { state, stateConfidence, ...stored } = session; return [session.id, preserveConfirmation(stored)]; }));
       const seen = new Set(); let added = 0, updated = 0;
       for (const thread of threads) {
         if (seen.has(thread.id)) continue;

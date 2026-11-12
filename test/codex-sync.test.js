@@ -18,13 +18,32 @@ test('sync reads live host WebSocket status, refreshes unchanged observations, a
   t.after(async () => { store.close(); process.env.PATH = oldPath; for (const client of server.clients) client.terminate(); await new Promise(resolve => server.close(resolve)); rmSync(dir, { recursive: true, force: true }); });
   const runningId = randomUUID(), idleId = randomUUID();
   const data = [{ id: runningId, name: '运行中', status: { type: 'active', activeFlags: [] } }, { id: idleId, name: '已停止', status: { type: 'idle' } }].map(thread => ({ ...thread, preview: '', cwd: dir, ephemeral: false, updatedAt: 1791705600 }));
-  const rolloutId = randomUUID(), waitingId = randomUUID(), wrongId = randomUUID();
+  const rolloutId = randomUUID(), waitingId = randomUUID(), wrongId = randomUUID(), questionId = randomUUID(), bookkeepingId = randomUUID();
   for (const id of [rolloutId, waitingId, wrongId]) {
     const path = join(dir, `${id}.jsonl`);
     const records = [{ timestamp: new Date(now).toISOString(), type: 'session_meta', payload: { id: id === wrongId ? randomUUID() : id } }, { timestamp: new Date(now).toISOString(), type: 'event_msg', payload: { type: 'task_started', turn_id: 'rollout-turn' } }, { timestamp: new Date(now).toISOString(), type: 'response_item', payload: { type: 'custom_tool_call' } }];
     writeFileSync(path, records.map(record => JSON.stringify(record)).join('\n') + '\n');
     data.push({ id, name: '桌面会话', preview: '', cwd: dir, path, ephemeral: false, updatedAt: Math.floor(now / 1000), status: { type: 'notLoaded' } });
   }
+  const questionPath = join(dir, `${questionId}.jsonl`), questionCall = 'call_pending_question';
+  const questionEvents = [
+    { timestamp: new Date(now).toISOString(), type: 'session_meta', payload: { id: questionId } },
+    { timestamp: new Date(now).toISOString(), type: 'event_msg', payload: { type: 'task_started', turn_id: 'question-turn' } },
+    { timestamp: new Date(now).toISOString(), type: 'response_item', payload: { type: 'function_call', name: 'request_user_input_async', call_id: questionCall, arguments: JSON.stringify({ questions: [{ title: 'One' }, { title: 'Two' }] }) } },
+    { timestamp: new Date(now).toISOString(), type: 'response_item', payload: { type: 'function_call_output', call_id: questionCall, output: JSON.stringify({ accepted: true }) } },
+    { timestamp: new Date(now).toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '普通补充消息' }] } },
+    { timestamp: new Date(now).toISOString(), type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: 'different-tool' } },
+  ];
+  writeFileSync(questionPath, questionEvents.map(event => JSON.stringify(event)).join('\n') + '\n');
+  data.push({ id: questionId, name: '等待用户输入', preview: '', cwd: dir, path: questionPath, ephemeral: false, updatedAt: Math.floor(now / 1000), status: { type: 'notLoaded' } });
+  const older = new Date(now - 360000).toISOString();
+  const bookkeepingPath = join(dir, `${bookkeepingId}.jsonl`);
+  writeFileSync(bookkeepingPath, [
+    { timestamp: older, type: 'session_meta', payload: { id: bookkeepingId } },
+    { timestamp: older, type: 'event_msg', payload: { type: 'task_started', turn_id: 'quiet-turn' } },
+    { timestamp: new Date(now).toISOString(), type: 'event_msg', payload: { type: 'token_count' } },
+  ].map(event => JSON.stringify(event)).join('\n') + '\n');
+  data.push({ id: bookkeepingId, name: '无新活动', preview: '', cwd: dir, path: bookkeepingPath, ephemeral: false, updatedAt: Math.floor(now / 1000), status: { type: 'notLoaded' } });
   store.observe({ session_id: waitingId, hook_event_name: 'PermissionRequest', cwd: dir, turn_id: 'rollout-turn' });
   const requests = [];
   server.on('connection', socket => socket.on('message', raw => {
@@ -54,12 +73,28 @@ if (process.argv.includes('proxy')) {
   assert.equal(store.sessions().find(session => session.id === rolloutId).source, 'codex-rollout');
   assert.equal(store.sessions().find(session => session.id === waitingId).state, 'waiting_approval');
   assert.equal(store.sessions().find(session => session.id === wrongId).state, 'unknown');
+  assert.equal(store.sessions().find(session => session.id === bookkeepingId).stateConfidence, 'last_observed');
+  const pendingQuestion = store.sessions().find(session => session.id === questionId);
+  assert.equal(pendingQuestion.state, 'waiting_input');
+  assert.equal(pendingQuestion.event, 'request_user_input_async');
+  assert.equal(JSON.stringify(pendingQuestion).includes('普通补充消息'), false);
+  now += 360000;
+  await codexAction(store, { operation: 'sync_threads' });
+  assert.equal(store.sessions().find(session => session.id === questionId).state, 'waiting_input');
+  const reply = index => ({ timestamp: new Date(now).toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `<send_user_message_question_reply>${JSON.stringify([{ questionItemId: JSON.stringify(['request_user_input_async', questionCall, index]), answer: 'ok' }])}</send_user_message_question_reply>` }] } });
+  appendFileSync(questionPath, JSON.stringify(reply(0)) + '\n');
+  await codexAction(store, { operation: 'sync_threads' });
+  assert.equal(store.sessions().find(session => session.id === questionId).state, 'waiting_input');
+  appendFileSync(questionPath, JSON.stringify(reply(1)) + '\n');
+  await codexAction(store, { operation: 'sync_threads' });
+  assert.equal(store.sessions().find(session => session.id === questionId).state, 'running');
   now += 360000;
   assert.equal(store.sessions().find(session => session.id === runningId).state, 'unknown');
   await codexAction(store, { operation: 'sync_threads' });
   assert.equal(store.sessions().find(session => session.id === runningId).state, 'running');
   assert.equal(store.sessions().find(session => session.id === runningId).observedAt, new Date(now).toISOString());
-  assert.equal(store.sessions().find(session => session.id === rolloutId).state, 'unknown');
+  assert.equal(store.sessions().find(session => session.id === rolloutId).state, 'running');
+  assert.equal(store.sessions().find(session => session.id === rolloutId).stateConfidence, 'last_observed');
   // A terminal record can be older than the recent-thread window after a disconnect.
   data.find(thread => thread.id === rolloutId).updatedAt = Math.floor(Date.now() / 1000) - 600;
   appendFileSync(join(dir, `${rolloutId}.jsonl`), JSON.stringify({ timestamp: new Date(now).toISOString(), type: 'event_msg', payload: { type: 'task_complete', turn_id: 'rollout-turn' } }) + '\n');

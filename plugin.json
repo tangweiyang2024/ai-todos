@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "ai-todos",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "独立本地任务、项目、OKR、计划、交付验收与专注工作台",
   "extensions": {
     "com.openai": {

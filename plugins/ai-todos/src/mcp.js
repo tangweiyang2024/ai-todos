@@ -42533,6 +42533,7 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default3 = {
+  "runtime.lastObservedRunning": "Last observed: running",
   "session.historicalCompleted": "Completed (historical)",
   "board.pending": "Needs confirmation",
   "project.search": "Search projects",
@@ -43152,6 +43153,7 @@ var en_default3 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "runtime.lastObservedRunning": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u6267\u884C\u4E2D",
   "session.historicalCompleted": "\u5DF2\u5B8C\u6210\uFF08\u5386\u53F2\u5F52\u7C7B\uFF09",
   "board.pending": "\u5F85\u786E\u8BA4",
   "project.search": "\u641C\u7D22\u9879\u76EE\u540D\u79F0",
@@ -43877,7 +43879,7 @@ import { join as join3 } from "node:path";
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.22",
+  version: "0.1.23",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",

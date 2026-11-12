@@ -183,22 +183,57 @@ async function rolloutObservation(thread: z.output<typeof threadPageSchema>["dat
   if (thread.status.type !== 'notLoaded' || !thread.path || (!trackedActive && Date.now() - thread.updatedAt * 1000 > 300000)) return;
   const input = createReadStream(thread.path), lines = createInterface({ input, crlfDelay: Infinity });
   let matched = false, latestAt = '', observation: { state: string; observedAt: string; event: string; source: string; turnId: string | null } | undefined;
+  const questions = new Map<string, { at: string; turnId: string | null; accepted: boolean; unanswered: Set<number> }>();
   try {
     for await (const line of lines) {
       try {
         const timestamp = line.match(/^\{"timestamp"\s*:\s*"([^"]+)"/)?.[1];
         if (!timestamp || !Number.isFinite(Date.parse(timestamp))) continue;
-        if (!latestAt || Date.parse(timestamp) > Date.parse(latestAt)) latestAt = timestamp;
-        // Read lifecycle records only; conversation text is not imported.
-        if (!/"type"\s*:\s*"(session_meta|task_started|task_complete|turn_aborted)"/.test(line)) continue;
+        // Periodic token bookkeeping does not prove a turn is still making progress.
+        if (!/"type"\s*:\s*"(token_count|token_usage_record)"/.test(line) && (!latestAt || Date.parse(timestamp) > Date.parse(latestAt))) latestAt = timestamp;
+        // Parse only lifecycle and input-request metadata. Never persist question or answer text.
+        const lifecycle = /"type"\s*:\s*"(session_meta|task_started|task_complete|turn_aborted)"/.test(line);
+        const request = line.includes('request_user_input_async') && /"type"\s*:\s*"function_call"/.test(line);
+        const result = questions.size > 0 && /"type"\s*:\s*"function_call_output"/.test(line) && [...questions.keys()].some(id => line.includes(JSON.stringify(id)));
+        const reply = questions.size > 0 && line.includes('send_user_message_question_reply');
+        if (!lifecycle && !request && !result && !reply) continue;
         const record = JSON.parse(line);
         if (record.type === 'session_meta') { if (record.payload?.id !== thread.id) return; matched = true; }
+        if (record.type === 'response_item') {
+          const payload = record.payload;
+          if (payload?.type === 'function_call' && payload.name === 'request_user_input_async' && typeof payload.call_id === 'string') {
+            try {
+              const args = JSON.parse(payload.arguments);
+              const count = Array.isArray(args.questions) ? args.questions.length : 0;
+              if (count > 0 && count <= 100) questions.set(payload.call_id, { at: timestamp, turnId: payload.internal_chat_message_metadata_passthrough?.turn_id ?? observation?.turnId ?? null, accepted: false, unanswered: new Set(Array.from({ length: count }, (_, index) => index)) });
+            } catch { /* Ignore malformed request metadata. */ }
+          } else if (payload?.type === 'function_call_output' && questions.has(payload.call_id)) {
+            try { questions.get(payload.call_id)!.accepted = JSON.parse(payload.output)?.accepted === true; } catch { /* Ignore malformed tool results. */ }
+          } else if (payload?.type === 'message' && payload.role === 'user' && Array.isArray(payload.content)) {
+            for (const part of payload.content) {
+              if (typeof part?.text !== 'string') continue;
+              for (const reply of part.text.matchAll(/<send_user_message_question_reply>\s*([\s\S]*?)\s*<\/send_user_message_question_reply>/g)) {
+                try {
+                  const answers = JSON.parse(reply[1]);
+                  if (!Array.isArray(answers)) continue;
+                  for (const answer of answers) {
+                    const key = JSON.parse(answer.questionItemId);
+                    if (Array.isArray(key) && key[0] === 'request_user_input_async' && typeof key[1] === 'string' && Number.isInteger(key[2])) questions.get(key[1])?.unanswered.delete(key[2]);
+                  }
+                } catch { /* Ignore unrelated or malformed messages. */ }
+              }
+            }
+          }
+          continue;
+        }
         if (record.type !== 'event_msg') continue;
         const state = ({ task_started: 'running', task_complete: 'idle', turn_aborted: 'interrupted' } as Record<string, string>)[record.payload?.type];
         if (!state || (record.payload.type !== 'task_started' && observation?.turnId && record.payload.turn_id && record.payload.turn_id !== observation.turnId)) continue;
         observation = { state, observedAt: timestamp, event: record.payload.type, source: 'codex-rollout', turnId: record.payload.turn_id ?? null };
       } catch { /* A concurrently appended final line may be incomplete. */ }
     }
+    const pending = [...questions.values()].filter(question => question.accepted && question.unanswered.size > 0).at(-1);
+    if (matched && pending) return { state: 'waiting_input', observedAt: pending.at, event: 'request_user_input_async', source: 'codex-rollout', turnId: pending.turnId };
     if (matched && observation) return { ...observation, observedAt: observation.state === 'running' ? latestAt : observation.observedAt };
   } catch { /* Unreadable history retains the API's unknown state. */ }
   finally { lines.close(); input.destroy(); }
@@ -216,6 +251,8 @@ async function listThreads(store: Store) {
         const preview = (requestIndex >= 0 ? thread.preview.slice(requestIndex + '## My request:'.length) : thread.preview).trim();
         const title = (thread.name?.trim() || preview.replace(/\s+/g, ' ') || `Codex · ${basename(thread.cwd)} · ${thread.id.slice(-8)}`).slice(0, 300);
         const observation = await rolloutObservation(thread, trackedActive.has(thread.id));
+        // A successful rescan confirms the request has not yet received its matching reply.
+        if (observation?.event === 'request_user_input_async') observation.observedAt = store.at();
         const state = observation?.state ?? codexRuntimeState(thread.status);
         threads.push({ id: thread.id, title, preview: preview.slice(0, 20000), cwd: normalize(thread.cwd), projectId: thread.projectId ?? null, updatedAt: new Date(thread.updatedAt * 1000).toISOString(), state, ...(observation ? { observation } : {}) });
       }

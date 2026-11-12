@@ -238,3 +238,15 @@ test('legacy reminder records remain readable and can be acknowledged', t => {
   s.command({ action: 'ack', id: notice.id });
   assert.equal(s.snapshot().notices[0].read, true);
 });
+
+test('long-running rollout shows stale observation for a limited time without asserting real-time state', t => {
+  const { store: s, advance } = fixture(t); const id = randomUUID();
+  const observedAt = s.at();
+  s.syncCodexThreads([{ id, title: '长任务', cwd: '/tmp', updatedAt: observedAt, state: 'running', observation: { observedAt, event: 'task_started', source: 'codex-rollout', turnId: 'turn' } }]);
+  advance(6 * 60000);
+  assert.equal(s.sessions()[0].state, 'running');
+  assert.equal(s.sessions()[0].stateConfidence, 'last_observed');
+  advance(25 * 60000);
+  assert.equal(s.sessions()[0].state, 'unknown');
+  assert.equal(s.sessions()[0].stateConfidence, undefined);
+});

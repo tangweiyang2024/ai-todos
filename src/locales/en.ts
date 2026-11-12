@@ -1,4 +1,5 @@
 export default {
+  "runtime.lastObservedRunning": "Last observed: running",
   "session.historicalCompleted": "Completed (historical)",
   "board.pending": "Needs confirmation",
   "project.search": "Search projects",
