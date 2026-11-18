@@ -17,7 +17,7 @@ test('sync reads live host WebSocket status, refreshes unchanged observations, a
   const store = new Store(join(dir, 'check.sqlite'), () => now);
   t.after(async () => { store.close(); process.env.PATH = oldPath; for (const client of server.clients) client.terminate(); await new Promise(resolve => server.close(resolve)); rmSync(dir, { recursive: true, force: true }); });
   const runningId = randomUUID(), idleId = randomUUID();
-  const data = [{ id: runningId, name: '运行中', status: { type: 'active', activeFlags: [] } }, { id: idleId, name: '已停止', status: { type: 'idle' } }].map(thread => ({ ...thread, preview: '', cwd: dir, ephemeral: false, updatedAt: 1791705600 }));
+  const data = [{ id: runningId, name: '运行中', status: { type: 'active', activeFlags: [] } }, { id: idleId, name: '已停止', status: { type: 'idle' } }].map(thread => ({ ...thread, preview: '', cwd: dir, ephemeral: false, createdAt: 1791600000, updatedAt: 1791705600 }));
   const rolloutId = randomUUID(), waitingId = randomUUID(), wrongId = randomUUID(), questionId = randomUUID(), bookkeepingId = randomUUID();
   for (const id of [rolloutId, waitingId, wrongId]) {
     const path = join(dir, `${id}.jsonl`);
@@ -36,6 +36,20 @@ test('sync reads live host WebSocket status, refreshes unchanged observations, a
   ];
   writeFileSync(questionPath, questionEvents.map(event => JSON.stringify(event)).join('\n') + '\n');
   data.push({ id: questionId, name: '等待用户输入', preview: '', cwd: dir, path: questionPath, ephemeral: false, updatedAt: Math.floor(now / 1000), status: { type: 'notLoaded' } });
+  // 旧问题不能覆盖结束或新轮次；其他轮次的结束事件不能关闭当前问题。
+  const questionLifecycleCases = [
+    { event: 'task_complete', turnId: 'question-turn', state: 'idle' },
+    { event: 'turn_aborted', turnId: 'question-turn', state: 'interrupted' },
+    { event: 'task_started', turnId: 'next-turn', state: 'running' },
+    { event: 'task_complete', turnId: 'other-turn', state: 'waiting_input' },
+  ].map(scenario => {
+    const id = randomUUID(), path = join(dir, `${id}.jsonl`);
+    const records = questionEvents.map((event, index) => index === 0 ? { ...event, payload: { id } } : event);
+    records.push({ timestamp: new Date(now + 1000).toISOString(), type: 'event_msg', payload: { type: scenario.event, turn_id: scenario.turnId } });
+    writeFileSync(path, records.map(event => JSON.stringify(event)).join('\n') + '\n');
+    data.push({ id, name: '旧问题生命周期', preview: '', cwd: dir, path, ephemeral: false, updatedAt: Math.floor(now / 1000), status: { type: 'notLoaded' } });
+    return { ...scenario, id, path };
+  });
   const older = new Date(now - 360000).toISOString();
   const bookkeepingPath = join(dir, `${bookkeepingId}.jsonl`);
   writeFileSync(bookkeepingPath, [
@@ -69,6 +83,7 @@ if (process.argv.includes('proxy')) {
   assert.equal((await codexAction(store, { operation: 'sync_threads' })).transport, 'host');
   assert.equal(store.sessions().find(session => session.id === runningId).state, 'running');
   assert.equal(store.sessions().find(session => session.id === idleId).state, 'idle');
+  assert.equal(store.sessions().find(session => session.id === idleId).catalogCreatedAt, new Date(1791600000 * 1000).toISOString());
   assert.equal(store.sessions().find(session => session.id === rolloutId).state, 'running');
   assert.equal(store.sessions().find(session => session.id === rolloutId).source, 'codex-rollout');
   assert.equal(store.sessions().find(session => session.id === waitingId).state, 'waiting_approval');
@@ -78,6 +93,19 @@ if (process.argv.includes('proxy')) {
   assert.equal(pendingQuestion.state, 'waiting_input');
   assert.equal(pendingQuestion.event, 'request_user_input_async');
   assert.equal(JSON.stringify(pendingQuestion).includes('普通补充消息'), false);
+  for (const scenario of questionLifecycleCases) {
+    const session = store.sessions().find(session => session.id === scenario.id);
+    assert.equal(session.state, scenario.state, `${scenario.event} (${scenario.turnId}) must supersede only its own pending questions`);
+    if (scenario.state !== 'waiting_input') assert.equal(session.event, scenario.event);
+  }
+  const nextQuestion = questionLifecycleCases.find(scenario => scenario.state === 'running');
+  appendFileSync(nextQuestion.path, [
+    { timestamp: new Date(now + 2000).toISOString(), type: 'response_item', payload: { type: 'function_call', name: 'request_user_input_async', call_id: 'next-question', arguments: JSON.stringify({ questions: [{ title: 'New turn question' }] }) } },
+    { timestamp: new Date(now + 2000).toISOString(), type: 'response_item', payload: { type: 'function_call_output', call_id: 'next-question', output: JSON.stringify({ accepted: true }) } },
+  ].map(event => JSON.stringify(event)).join('\n') + '\n');
+  await codexAction(store, { operation: 'sync_threads' });
+  assert.equal(store.sessions().find(session => session.id === nextQuestion.id).state, 'waiting_input');
+  assert.equal(store.sessions().find(session => session.id === nextQuestion.id).turnId, 'next-turn');
   now += 360000;
   await codexAction(store, { operation: 'sync_threads' });
   assert.equal(store.sessions().find(session => session.id === questionId).state, 'waiting_input');

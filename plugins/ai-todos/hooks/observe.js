@@ -5,11 +5,8 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// src/domain.ts
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { randomUUID } from "node:crypto";
+// src/experience-chat.ts
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 
 // node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -5037,7 +5034,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve2) {
+function isRecursive(inst, stack, resolve3) {
   const cached2 = recursive.get(inst);
   if (cached2 !== void 0)
     return cached2 ? PROVEN : NONE;
@@ -5047,7 +5044,7 @@ function isRecursive(inst, stack, resolve2) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve2);
+      const answer = isRecursive(child, stack, resolve3);
       if (answer > result)
         result = answer;
     }
@@ -5058,7 +5055,7 @@ function isRecursive(inst, stack, resolve2) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve2) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve3) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -5122,7 +5119,7 @@ function isRecursive(inst, stack, resolve2) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve2 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve3 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -19684,8 +19681,8 @@ var isString = (obj) => typeof obj === "string";
 var defer = () => {
   let res;
   let rej;
-  const promise2 = new Promise((resolve2, reject) => {
-    res = resolve2;
+  const promise2 = new Promise((resolve3, reject) => {
+    res = resolve3;
     rej = reject;
   });
   promise2.resolve = res;
@@ -20954,9 +20951,9 @@ var Interpolator = class {
     let value;
     let clonedOptions;
     const handleHasOptions = (key, inheritedOptions) => {
-      const sep = this.nestingOptionsSeparator;
-      if (!key.includes(sep)) return key;
-      const c = key.split(new RegExp(`${regexEscape(sep)}[ ]*{`));
+      const sep2 = this.nestingOptionsSeparator;
+      if (!key.includes(sep2)) return key;
+      const c = key.split(new RegExp(`${regexEscape(sep2)}[ ]*{`));
       let optionsString = `{${c[1]}`;
       key = c[0];
       optionsString = this.interpolate(optionsString, clonedOptions);
@@ -20973,7 +20970,7 @@ var Interpolator = class {
         };
       } catch (e) {
         this.logger.warn(`failed parsing options string in nesting for key ${key}`, e);
-        return `${key}${sep}${optionsString}`;
+        return `${key}${sep2}${optionsString}`;
       }
       if (clonedOptions.defaultValue && clonedOptions.defaultValue.includes(this.prefix)) delete clonedOptions.defaultValue;
       return key;
@@ -21964,6 +21961,137 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default2 = {
+  "wiki.analysisModel": "Analysis model",
+  "wiki.reasoningEffort": "Reasoning effort",
+  "wiki.chooseModel": "Choose a model",
+  "wiki.chooseModelFirst": "Choose a model first",
+  "wiki.noReasoningEffort": "Not required",
+  "wiki.refreshModels": "Refresh models",
+  "wiki.modelChoiceHint": "Your last started selection is remembered. Existing candidates keep their recorded model for Wiki comparison; older candidates without model data use your current selection. Codex global settings are unchanged.",
+  "wiki.modelListFailed": "Could not load models: {{message}}",
+  "wiki.selectedModelUnavailable": "Your previous model or reasoning effort is unavailable. Refresh the list and choose again.",
+  "wiki.runningModel": "Running with: {{model}}",
+  "wiki.recordModel": "Extracted with: {{model}}",
+  "wiki.comparisonModel": "Wiki comparison: {{model}}",
+  "wiki.modelNotRecorded": "Not recorded for this older candidate",
+  "wiki.scopeHint": "Session content, selected Wiki and human-facing pages, and Vault category information are sent to your configured Codex model. New topics produce Wiki and human-facing notes. Duplicate checks cover the compared pages only.",
+  "wiki.sources": "Compared pages",
+  "wiki.agentPath": "Wiki: {{path}}",
+  "wiki.vaultPath": "Vault human-facing note: {{path}}",
+  "wiki.recordChanged": "The candidate changed. Return to the workspace and preview it again.",
+  "wiki.recordMissing": "The requested candidate is unavailable. Return to the workspace and select it again.",
+  "wiki.localApprovalHint": "For human-only approval, review and confirm the final write in the local browser page.",
+  "wiki.localApprovalOpened": "The local review page was requested. If it did not open, visit:",
+  "wiki.openApproval": "Open local approval",
+  "wiki.capturePreparing": "Preparing the experience conversation and source\u2026",
+  "wiki.captureQueued": "Preparing in the background. You can keep working; we will notify you when it is ready.",
+  "wiki.captureInBackground": "Preparing in background",
+  "wiki.captureBackgroundHint": "Keep working. A notice will appear when the conversation is ready.",
+  "wiki.capturePreparationFailed": "Preparation incomplete",
+  "wiki.captureCheckNeeded": "Check creation result",
+  "wiki.retryCapture": "Retry preparation",
+  "wiki.enterCapture": "Open experience conversation",
+  "wiki.captureReadyTitle": "Experience conversation is ready",
+  "wiki.captureReadyDescription": "Source material and instructions are ready. Open the conversation, choose a model and send the prepared prompt to begin.",
+  "wiki.captureLater": "Later",
+  "wiki.capturePreparationStage.reading": "Reading source material",
+  "wiki.capturePreparationStage.connecting": "Connecting to Codex",
+  "wiki.capturePreparationStage.creating": "Creating conversation",
+  "wiki.capturePreparationStage.seeding": "Preparing handoff prompt",
+  "wiki.capturePreparationStage.ready": "Ready",
+  "wiki.captureContinued": "Opened the existing Codex experience conversation.",
+  "wiki.captureOpened": "Opened the Codex experience conversation. Choose a model and send the prepared prompt there.",
+  "wiki.continueCapture": "Continue experience",
+  "wiki.captureProgressHint": "Runtime comes from Codex; stages and ingest results are reported by the conversation",
+  "wiki.captureStatus.ready": "Experience conversation ready",
+  "wiki.captureStatus.running": "Preparing experience",
+  "wiki.captureStatus.waiting": "Experience needs your input",
+  "wiki.captureStatus.paused": "Experience turn ended",
+  "wiki.captureStatus.interrupted": "Experience interrupted",
+  "wiki.captureStatus.failed": "Experience failed",
+  "wiki.captureStatus.unknown": "Experience status unavailable",
+  "wiki.captureStatus.reported_complete": "Conversation reports ingested",
+  "wiki.captureStatus.no_knowledge": "No durable knowledge found",
+  "wiki.captureStage.ready": "Prompt ready",
+  "wiki.captureStage.completed": "Completion reported",
+  "wiki.captureStage.no_knowledge": "No durable knowledge",
+  "wiki.captureStage.failed": "Failure reported",
+  "wiki.captureStage.reading": "Reading source",
+  "wiki.captureStage.reviewing": "Reviewing experience",
+  "wiki.captureStage.planning": "Preparing ingest",
+  "wiki.captureStage.awaiting_approval": "Awaiting write approval",
+  "wiki.captureStage.writing": "Writing Wiki",
+  "wiki.captureStage.checking": "Checking ingest",
+  "wiki.title": "Capture experience",
+  "wiki.description": "Review findings, related Wiki pages, and every proposed change before approval.",
+  "wiki.localHint": "Findings and review notes are stored locally.",
+  "wiki.loading": "Loading review history\u2026",
+  "wiki.processing": "Processing\u2026",
+  "wiki.extract": "Extract experience",
+  "wiki.agentProgress": "Codex is preparing experience. Read {{completed}} / {{total}} source pages; conclusions still need verification. You can close this window and return later.",
+  "wiki.agentFailed": "Analysis incomplete: {{message}}. Read {{completed}} / {{total}} pages. Retry checks the snapshot before resuming the background conversation.",
+  "wiki.agentCoverageNotice": "Read all {{total}} source pages and created candidates. Reading coverage does not establish correctness. Review each item; non-text content may not be understood.",
+  "wiki.agentDetails": "Background analysis task",
+  "wiki.agentIsolationHint": "This conversation is hidden from ordinary session lists and execution boards. Official Wiki writes still require your final approval.",
+  "wiki.agentThread": "Codex conversation:",
+  "wiki.agentActivity": "Last activity: {{time}} \xB7 {{calls}} tool calls \xB7 {{compactions}} native compactions \xB7 attempt {{attempt}}",
+  "wiki.agentSnapshot": "Source snapshot:",
+  "wiki.progress": "Reading the session and identifying experiences. You can close this window and return later.",
+  "wiki.chunkProgress": "Analyzing chunks: {{completed}} / {{total}} complete. You can close this window and return later.",
+  "wiki.mergeProgress": "Combining chunks and checking later corrections. You can close this window and return later.",
+  "wiki.curateProgress": "Selecting durable knowledge for this task, combining related findings and removing routine activity and generic advice.",
+  "wiki.verifyProgress": "Checking original evidence. Model checks are only aids for human review.",
+  "wiki.legacyAnalysisFailed": "The previous chunk-based job did not finish: {{message}}. Retry uses a native Codex background conversation; old chunk results are kept separate.",
+  "wiki.analysisFailed": "Analysis incomplete ({{completed}} / {{total}} chunks): {{message}}. Retrying checks the source and resumes completed chunks.",
+  "wiki.retryAnalysis": "Retry analysis",
+  "wiki.cancelComparison": "Cancel Wiki comparison",
+  "wiki.cancelAnalysis": "Cancel analysis",
+  "wiki.connectionOutdated": "This plugin connection is still using an older version. Reconnect it to use the new flow here, or continue in the local workspace.",
+  "wiki.continueInBrowser": "Continue in local workspace",
+  "wiki.analysisCompleteHistory": "The new analysis was saved. Select it from history to review it.",
+  "wiki.coverageNotice": "Processed {{total}} / {{total}} source chunks. The model may miss experience or not understand non-text content such as images; review against the original session.",
+  "wiki.history": "History",
+  "wiki.workspaceTitle": "Experience review",
+  "wiki.edit": "Edit",
+  "wiki.doneEditing": "Done editing",
+  "wiki.emptyValue": "No content",
+  "wiki.proposedHeading": "Proposed changes",
+  "wiki.stagedHint": "Review each experience and save before checking Wiki duplicates and conflicts. Writing still requires a preview and human approval.",
+  "wiki.sessionStep": "Session overview",
+  "wiki.compareStep": "Wiki comparison",
+  "wiki.writeStep": "Preview and write",
+  "wiki.experienceItems": "Review each experience",
+  "wiki.noExperiences": "No reusable experience was identified in this session.",
+  "wiki.itemNote": "My feedback",
+  "wiki.decision.pending": "Pending",
+  "wiki.decision.confirmed": "Confirmed",
+  "wiki.decision.excluded": "Excluded",
+  "wiki.action.confirmed": "Confirm",
+  "wiki.action.excluded": "Exclude",
+  "wiki.startCompare": "Check Wiki duplicates and conflicts",
+  "wiki.saveDecisionsHint": "Confirm or exclude each item, add feedback, then save before comparing with the Wiki.",
+  "wiki.legacyNotice": "This older record already includes a Wiki comparison. Extract again to use the new item-by-item review flow.",
+  "wiki.empty": "No analysis yet. Select \u201CExtract experience\u201D to begin.",
+  "wiki.noChanges": "No proposed changes",
+  "wiki.summary": "Conclusion",
+  "wiki.scope": "Applicability",
+  "wiki.evidence": "Evidence (including session items)",
+  "wiki.unverified": "Unverified",
+  "wiki.relation": "Similar Wiki content and potential conflicts",
+  "wiki.reviewNote": "My review notes",
+  "wiki.proposedContent": "Proposed full content: {{path}}",
+  "wiki.previewHint": "Review every file. Changes to the candidate or Wiki require a fresh preview. Avoid simultaneous edits from other programs while approving.",
+  "wiki.back": "Back to review",
+  "wiki.approve": "Approve and write to Wiki",
+  "wiki.reject": "Reject",
+  "wiki.save": "Save edits",
+  "wiki.preview": "Preview changes",
+  "wiki.status.pending": "Pending review",
+  "wiki.status.rejected": "Rejected",
+  "wiki.status.written": "Written",
+  "workspace.lastObservedAt": "Status last observed: {{at}}",
+  "runtime.lastObservedApproval": "Last observed: awaiting authorization",
+  "runtime.lastObservedInput": "Last observed: awaiting user input",
   "runtime.lastObservedRunning": "Last observed: running",
   "session.historicalCompleted": "Completed (historical)",
   "board.pending": "Needs confirmation",
@@ -22450,6 +22578,50 @@ var en_default2 = {
   "review.actualRevision": " \xB7 Actually reviewed r{{revision}}",
   "delete.title": "Confirm deletion",
   "delete.hint": "Only unexecuted data without references or time records can be deleted. Cancel tasks with execution records.",
+  "session.summaryGenerate": "Generate summary",
+  "session.summaryQueued": "Summary queued",
+  "session.summaryPending": "Summary not yet generated",
+  "session.summaryGenerating": "Generating session summary\u2026",
+  "session.summaryFailed": "Summary generation failed; will retry later",
+  "session.summaryPartial": "Generated from part of the session",
+  "session.summaryOutdated": "Session updated; summary pending refresh",
+  "batch.groupProjects": "Group by project",
+  "batch.completeAll": "Complete sessions",
+  "batch.pendingRange": "Pending date range",
+  "batch.completedRange": "Completed date range",
+  "batch.lastDays": "Last {{count}} days",
+  "batch.lastTwoDays": "Last 2 days",
+  "batch.lastSevenDays": "Last 7 days",
+  "batch.allTime": "All time",
+  "batch.custom": "Custom",
+  "batch.invalidRange": "Start date must not be after end date",
+  "batch.startDate": "Start date",
+  "batch.endDate": "End date",
+  "batch.unknownCreated": "Creation time unknown",
+  "batch.created": "Created",
+  "batch.taskNotAccepted": "Session archived; task not accepted",
+  "batch.completeProject": "Complete pending",
+  "batch.interrupted": "Interrupted or failed",
+  "batch.title": "Confirm session completion",
+  "batch.description": "Move selected sessions to Completed. This does not stop running sessions or accept linked tasks.",
+  "batch.selected": "Selected {{count}} of {{total}} sessions",
+  "batch.runningWarning": "Completing a running session does not stop it; new activity will reopen it.",
+  "batch.confirm": "Confirm ({{count}})",
+  "batch.success": "Completed {{count}} sessions",
+  "batch.result": "{{succeeded}} completed, {{failed}} incomplete",
+  "batch.selectAll": "Select all",
+  "batch.deselectAll": "Clear selection",
+  "batch.statusSelection": "Select by session status",
+  "batch.refreshState": "Refresh status",
+  "batch.unknownFailure": "The action did not complete. Refresh the status and retry.",
+  "batch.processing": "Processing",
+  "batch.empty": "No sessions need action in this selection.",
+  "batch.footerHint": "New activity will reopen the session",
+  "batch.archive": "Archive",
+  "settings.sessionAge": "Session visibility",
+  "settings.sessionAgeDays": "Days since last update",
+  "settings.sessionAgeHint": "Enter 0 for no limit. Older sessions are hidden, not deleted. Sessions with unknown activity dates remain visible.",
+  "settings.sessionAgeSaved": "Session visibility saved",
   "settings.language": "Language",
   "settings.followSystem": "Follow system",
   "settings.languageHint": "Automatic mode follows the Codex host language, then the browser language.",
@@ -22584,6 +22756,137 @@ var en_default2 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "wiki.analysisModel": "\u5206\u6790\u6A21\u578B",
+  "wiki.reasoningEffort": "\u63A8\u7406\u5F3A\u5EA6",
+  "wiki.chooseModel": "\u8BF7\u9009\u62E9\u6A21\u578B",
+  "wiki.chooseModelFirst": "\u5148\u9009\u62E9\u6A21\u578B",
+  "wiki.noReasoningEffort": "\u8BE5\u6A21\u578B\u65E0\u9700\u8BBE\u7F6E",
+  "wiki.refreshModels": "\u5237\u65B0\u5217\u8868",
+  "wiki.modelChoiceHint": "\u4F1A\u8BB0\u4F4F\u4E0A\u6B21\u542F\u52A8\u65F6\u7684\u9009\u62E9\u3002\u5DF2\u6709\u8BB0\u5F55\u7684 Wiki \u5BF9\u7167\u6CBF\u7528\u8BB0\u5F55\u4E2D\u7684\u6A21\u578B\uFF1B\u65E7\u8BB0\u5F55\u672A\u4FDD\u5B58\u6A21\u578B\u65F6\u4F7F\u7528\u5F53\u524D\u9009\u62E9\u3002\u4E0D\u4FEE\u6539 Codex \u5168\u5C40\u8BBE\u7F6E\u3002",
+  "wiki.modelListFailed": "\u6A21\u578B\u5217\u8868\u8BFB\u53D6\u5931\u8D25\uFF1A{{message}}",
+  "wiki.selectedModelUnavailable": "\u4E0A\u6B21\u9009\u62E9\u7684\u6A21\u578B\u6216\u63A8\u7406\u5F3A\u5EA6\u5F53\u524D\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5237\u65B0\u5217\u8868\u5E76\u91CD\u65B0\u9009\u62E9\u3002",
+  "wiki.runningModel": "\u672C\u6B21\u5206\u6790\uFF1A{{model}}",
+  "wiki.recordModel": "\u63D0\u53D6\u4F7F\u7528\uFF1A{{model}}",
+  "wiki.comparisonModel": "Wiki \u5BF9\u7167\u4F7F\u7528\uFF1A{{model}}",
+  "wiki.modelNotRecorded": "\u65E7\u8BB0\u5F55\u672A\u4FDD\u5B58\u6A21\u578B\u4FE1\u606F",
+  "wiki.scopeHint": "\u4F1A\u8BDD\u5185\u5BB9\u3001\u9009\u4E2D\u7684 Wiki \u4E0E\u4EBA\u8BFB\u7248\u9875\u9762\u4EE5\u53CA Vault \u5206\u7C7B\u4FE1\u606F\u4F1A\u53D1\u9001\u7ED9\u672C\u6B21\u9009\u5B9A\u7684 Codex \u6A21\u578B\uFF1B\u65B0\u4E3B\u9898\u4F1A\u540C\u65F6\u751F\u6210 Wiki \u7248\u4E0E\u4EBA\u8BFB\u7248\u3002\u67E5\u91CD\u8303\u56F4\u4EE5\u5BF9\u7167\u9875\u9762\u4E3A\u51C6\u3002",
+  "wiki.sources": "\u5DF2\u5BF9\u7167\u9875\u9762",
+  "wiki.agentPath": "Wiki\uFF1A{{path}}",
+  "wiki.vaultPath": "Vault \u4EBA\u8BFB\u7248\uFF1A{{path}}",
+  "wiki.recordChanged": "\u5BA1\u6838\u5019\u9009\u5DF2\u66F4\u65B0\uFF0C\u8BF7\u8FD4\u56DE\u5DE5\u4F5C\u53F0\u91CD\u65B0\u9884\u89C8\u3002",
+  "wiki.recordMissing": "\u539F\u5BA1\u6838\u5019\u9009\u4E0D\u5B58\u5728\uFF0C\u8BF7\u8FD4\u56DE\u5DE5\u4F5C\u53F0\u91CD\u65B0\u9009\u62E9\u3002",
+  "wiki.localApprovalHint": "\u4E3A\u786E\u4FDD\u53EA\u80FD\u7531\u4F60\u6279\u51C6\uFF0C\u6700\u7EC8\u5199\u5165\u9700\u5728\u672C\u5730\u6D4F\u89C8\u5668\u9875\u9762\u518D\u6B21\u9884\u89C8\u5E76\u786E\u8BA4\u3002",
+  "wiki.localApprovalOpened": "\u5DF2\u8BF7\u6C42\u6253\u5F00\u672C\u5730\u5BA1\u6838\u9875\u9762\uFF1B\u5982\u672A\u663E\u793A\uFF0C\u8BF7\u624B\u52A8\u8BBF\u95EE\uFF1A",
+  "wiki.openApproval": "\u6253\u5F00\u672C\u5730\u9875\u9762\u6279\u51C6",
+  "wiki.capturePreparing": "\u6B63\u5728\u51C6\u5907\u6C89\u6DC0\u4F1A\u8BDD\u4E0E\u539F\u6587\u8D44\u6599\u2026",
+  "wiki.captureQueued": "\u5DF2\u5728\u540E\u53F0\u51C6\u5907\uFF0C\u5B8C\u6210\u540E\u4F1A\u63D0\u9192\u4F60\uFF0C\u53EF\u7EE7\u7EED\u5904\u7406\u5176\u4ED6\u5DE5\u4F5C\u3002",
+  "wiki.captureInBackground": "\u540E\u53F0\u51C6\u5907\u4E2D",
+  "wiki.captureBackgroundHint": "\u53EF\u7EE7\u7EED\u5904\u7406\u5176\u4ED6\u5DE5\u4F5C\uFF0C\u51C6\u5907\u5B8C\u6210\u540E\u4F1A\u5F39\u7A97\u63D0\u9192\u3002",
+  "wiki.capturePreparationFailed": "\u6C89\u6DC0\u51C6\u5907\u672A\u5B8C\u6210",
+  "wiki.captureCheckNeeded": "\u521B\u5EFA\u7ED3\u679C\u5F85\u6838\u5BF9",
+  "wiki.retryCapture": "\u91CD\u8BD5\u51C6\u5907",
+  "wiki.enterCapture": "\u8FDB\u5165\u6C89\u6DC0\u4F1A\u8BDD",
+  "wiki.captureReadyTitle": "\u6C89\u6DC0\u4F1A\u8BDD\u5DF2\u5C31\u7EEA",
+  "wiki.captureReadyDescription": "\u539F\u6587\u8D44\u6599\u548C\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907\u597D\u3002\u8FDB\u5165\u4F1A\u8BDD\u540E\u9009\u62E9\u6A21\u578B\u5E76\u53D1\u9001\uFF0C\u5373\u53EF\u5F00\u59CB\u6C89\u6DC0\u3002",
+  "wiki.captureLater": "\u7A0D\u540E",
+  "wiki.capturePreparationStage.reading": "\u8BFB\u53D6\u539F\u6587\u8D44\u6599",
+  "wiki.capturePreparationStage.connecting": "\u8FDE\u63A5 Codex",
+  "wiki.capturePreparationStage.creating": "\u521B\u5EFA\u6C89\u6DC0\u4F1A\u8BDD",
+  "wiki.capturePreparationStage.seeding": "\u51C6\u5907\u4EA4\u63A5\u63D0\u793A\u8BCD",
+  "wiki.capturePreparationStage.ready": "\u51C6\u5907\u5C31\u7EEA",
+  "wiki.captureContinued": "\u5DF2\u6253\u5F00\u539F\u6765\u7684 Codex \u6C89\u6DC0\u4F1A\u8BDD\u3002",
+  "wiki.captureOpened": "\u5DF2\u6253\u5F00 Codex \u6C89\u6DC0\u4F1A\u8BDD\uFF1B\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u9009\u62E9\u6A21\u578B\u5E76\u53D1\u9001\u3002",
+  "wiki.continueCapture": "\u7EE7\u7EED\u6C89\u6DC0",
+  "wiki.captureProgressHint": "\u8FD0\u884C\u72B6\u6001\u6765\u81EA Codex\uFF1B\u5177\u4F53\u9636\u6BB5\u548C\u5165\u5E93\u7ED3\u679C\u7531\u6C89\u6DC0\u4F1A\u8BDD\u56DE\u62A5",
+  "wiki.captureStatus.ready": "\u6C89\u6DC0\u4F1A\u8BDD\u5DF2\u5C31\u7EEA",
+  "wiki.captureStatus.running": "\u6B63\u5728\u6C89\u6DC0",
+  "wiki.captureStatus.waiting": "\u6C89\u6DC0\u5F85\u4F60\u786E\u8BA4",
+  "wiki.captureStatus.paused": "\u6C89\u6DC0\u4F1A\u8BDD\u672C\u8F6E\u7ED3\u675F",
+  "wiki.captureStatus.interrupted": "\u6C89\u6DC0\u5DF2\u4E2D\u65AD",
+  "wiki.captureStatus.failed": "\u6C89\u6DC0\u5F02\u5E38",
+  "wiki.captureStatus.unknown": "\u6C89\u6DC0\u72B6\u6001\u5F85\u540C\u6B65",
+  "wiki.captureStatus.reported_complete": "\u4F1A\u8BDD\u62A5\u544A\u5DF2\u5165\u5E93",
+  "wiki.captureStatus.no_knowledge": "\u672C\u6B21\u65E0\u53EF\u6C89\u6DC0\u7ECF\u9A8C",
+  "wiki.captureStage.ready": "\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907",
+  "wiki.captureStage.completed": "\u5165\u5E93\u5B8C\u6210\u56DE\u62A5",
+  "wiki.captureStage.no_knowledge": "\u65E0\u53EF\u6C89\u6DC0\u5185\u5BB9",
+  "wiki.captureStage.failed": "\u5F02\u5E38\u56DE\u62A5",
+  "wiki.captureStage.reading": "\u8BFB\u53D6\u539F\u4F1A\u8BDD",
+  "wiki.captureStage.reviewing": "\u786E\u8BA4\u7ECF\u9A8C",
+  "wiki.captureStage.planning": "\u51C6\u5907 ingest",
+  "wiki.captureStage.awaiting_approval": "\u7B49\u5F85\u5199\u5165\u6279\u51C6",
+  "wiki.captureStage.writing": "\u5199\u5165 Wiki",
+  "wiki.captureStage.checking": "\u68C0\u67E5\u5165\u5E93\u7ED3\u679C",
+  "wiki.title": "\u6C89\u6DC0\u7ECF\u9A8C",
+  "wiki.description": "\u6838\u5BF9\u7ED3\u8BBA\u3001Wiki \u5BF9\u7167\u548C\u62DF\u4FEE\u6539\u5185\u5BB9\uFF1B\u53EA\u6709\u4EBA\u5DE5\u6279\u51C6\u540E\u624D\u5199\u5165\u3002",
+  "wiki.localHint": "\u5206\u6790\u7ED3\u8BBA\u548C\u5BA1\u6838\u610F\u89C1\u4FDD\u5B58\u5728\u672C\u673A\u3002",
+  "wiki.loading": "\u6B63\u5728\u8BFB\u53D6\u5BA1\u6838\u8BB0\u5F55\u2026",
+  "wiki.processing": "\u5904\u7406\u4E2D\u2026",
+  "wiki.extract": "\u63D0\u53D6\u7ECF\u9A8C",
+  "wiki.agentProgress": "Codex \u6B63\u5728\u6574\u7406\u7ECF\u9A8C\uFF0C\u5DF2\u8BFB\u53D6 {{completed}} / {{total}} \u9875\u539F\u6587\u3002\u8BFB\u53D6\u5B8C\u6210\u540E\u4ECD\u9700\u6838\u5B9E\u548C\u5F62\u6210\u7ED3\u8BBA\uFF0C\u53EF\u4EE5\u5173\u95ED\u7A97\u53E3\u7A0D\u540E\u56DE\u6765\u3002",
+  "wiki.agentFailed": "\u672C\u6B21\u6574\u7406\u672A\u5B8C\u6210\uFF1A{{message}}\u3002\u5DF2\u8BFB {{completed}} / {{total}} \u9875\uFF1B\u91CD\u8BD5\u4F1A\u5148\u6838\u5BF9\u539F\u6587\u5FEB\u7167\uFF0C\u518D\u6062\u590D\u5BF9\u5E94\u540E\u53F0\u4F1A\u8BDD\u3002",
+  "wiki.agentCoverageNotice": "\u5DF2\u8BFB\u53D6\u5168\u90E8 {{total}} \u9875\u539F\u6587\u5E76\u751F\u6210\u5019\u9009\u3002\u8BFB\u53D6\u8986\u76D6\u4E0D\u7B49\u4E8E\u7ED3\u8BBA\u6B63\u786E\uFF1B\u8BF7\u9010\u9879\u6838\u5BF9\uFF0C\u56FE\u7247\u7B49\u975E\u6587\u672C\u5185\u5BB9\u53EF\u80FD\u65E0\u6CD5\u7406\u89E3\u3002",
+  "wiki.agentDetails": "\u540E\u53F0\u6574\u7406\u4EFB\u52A1",
+  "wiki.agentIsolationHint": "\u6B64\u4F1A\u8BDD\u53EA\u7528\u4E8E\u6574\u7406\u7ECF\u9A8C\uFF0C\u4E0D\u51FA\u73B0\u5728\u666E\u901A\u4F1A\u8BDD\u5217\u8868\u6216\u6267\u884C\u770B\u677F\u4E2D\u3002\u6B63\u5F0F Wiki \u4ECD\u9700\u6700\u7EC8\u4EBA\u5DE5\u6279\u51C6\u3002",
+  "wiki.agentThread": "\u5173\u8054 Codex \u4F1A\u8BDD\uFF1A",
+  "wiki.agentActivity": "\u6700\u8FD1\u6D3B\u52A8\uFF1A{{time}} \xB7 \u5DE5\u5177\u8BFB\u53D6 {{calls}} \u6B21 \xB7 \u539F\u751F\u538B\u7F29 {{compactions}} \u6B21 \xB7 \u7B2C {{attempt}} \u6B21\u6267\u884C",
+  "wiki.agentSnapshot": "\u6765\u6E90\u5FEB\u7167\uFF1A",
+  "wiki.progress": "\u6B63\u5728\u8BFB\u53D6\u4F1A\u8BDD\u5E76\u6574\u7406\u7ECF\u9A8C\u3002\u53EF\u4EE5\u5173\u95ED\u6B64\u7A97\u53E3\uFF0C\u5B8C\u6210\u540E\u518D\u6253\u5F00\u67E5\u770B\u3002",
+  "wiki.chunkProgress": "\u6B63\u5728\u5206\u6BB5\u5206\u6790\uFF1A\u5DF2\u5B8C\u6210 {{completed}} / {{total}} \u6BB5\u3002\u53EF\u4EE5\u5173\u95ED\u6B64\u7A97\u53E3\uFF0C\u7A0D\u540E\u56DE\u6765\u67E5\u770B\u3002",
+  "wiki.mergeProgress": "\u6B63\u5728\u5408\u5E76\u5404\u6BB5\u7ED3\u679C\u5E76\u68C0\u67E5\u524D\u540E\u4FEE\u6B63\u3002\u53EF\u4EE5\u5173\u95ED\u6B64\u7A97\u53E3\uFF0C\u7A0D\u540E\u56DE\u6765\u67E5\u770B\u3002",
+  "wiki.curateProgress": "\u6B63\u5728\u6309\u4F1A\u8BDD\u76EE\u6807\u7B5B\u9009\u957F\u671F\u77E5\u8BC6\uFF0C\u5408\u5E76\u540C\u7C7B\u53D1\u73B0\u5E76\u6392\u9664\u64CD\u4F5C\u6D41\u6C34\u548C\u6CDB\u6CDB\u5EFA\u8BAE\u3002",
+  "wiki.verifyProgress": "\u6B63\u5728\u56DE\u67E5\u539F\u59CB\u4F9D\u636E\u3002\u6A21\u578B\u56DE\u67E5\u4EC5\u4F9B\u4EBA\u5DE5\u5BA1\u6838\u53C2\u8003\u3002",
+  "wiki.legacyAnalysisFailed": "\u65E7\u7248\u5206\u6BB5\u4EFB\u52A1\u672A\u5B8C\u6210\uFF1A{{message}}\u3002\u91CD\u8BD5\u5C06\u4F7F\u7528\u539F\u751F Codex \u540E\u53F0\u4F1A\u8BDD\uFF0C\u65E7\u5206\u6BB5\u4E0D\u4F1A\u6DF7\u5165\u65B0\u5206\u6790\u3002",
+  "wiki.analysisFailed": "\u5206\u6790\u672A\u5B8C\u6210\uFF08{{completed}} / {{total}} \u6BB5\uFF09\uFF1A{{message}}\u3002\u91CD\u8BD5\u65F6\u5C06\u6838\u5BF9\u539F\u4F1A\u8BDD\uFF0C\u5E76\u6062\u590D\u5DF2\u5B8C\u6210\u7684\u5206\u6BB5\u3002",
+  "wiki.retryAnalysis": "\u91CD\u8BD5\u5206\u6790",
+  "wiki.cancelComparison": "\u53D6\u6D88 Wiki \u5BF9\u7167",
+  "wiki.cancelAnalysis": "\u53D6\u6D88\u5206\u6790",
+  "wiki.connectionOutdated": "\u5F53\u524D\u63D2\u4EF6\u8FDE\u63A5\u4ECD\u662F\u65E7\u7248\u672C\uFF0C\u91CD\u65B0\u8FDE\u63A5\u63D2\u4EF6\u540E\u53EF\u5728\u6B64\u4F7F\u7528\u65B0\u6D41\u7A0B\u3002\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u672C\u5730\u5DE5\u4F5C\u53F0\u7EE7\u7EED\u3002",
+  "wiki.continueInBrowser": "\u5728\u672C\u5730\u5DE5\u4F5C\u53F0\u7EE7\u7EED",
+  "wiki.analysisCompleteHistory": "\u65B0\u7684\u5206\u6790\u5DF2\u5B8C\u6210\u5E76\u4FDD\u5B58\uFF0C\u53EF\u5728\u5386\u53F2\u8BB0\u5F55\u4E2D\u5207\u6362\u67E5\u770B\u3002",
+  "wiki.coverageNotice": "\u5DF2\u5904\u7406 {{total}} / {{total}} \u4E2A\u8BFB\u53D6\u5206\u6BB5\u3002\u6A21\u578B\u53EF\u80FD\u9057\u6F0F\u7ECF\u9A8C\u6216\u65E0\u6CD5\u7406\u89E3\u56FE\u7247\u7B49\u975E\u6587\u672C\u5185\u5BB9\uFF0C\u8BF7\u7ED3\u5408\u539F\u4F1A\u8BDD\u5BA1\u6838\u3002",
+  "wiki.history": "\u5386\u53F2\u8BB0\u5F55",
+  "wiki.workspaceTitle": "\u7ECF\u9A8C\u5BA1\u6838\u5DE5\u4F5C\u53F0",
+  "wiki.edit": "\u7F16\u8F91",
+  "wiki.doneEditing": "\u5B8C\u6210\u7F16\u8F91",
+  "wiki.emptyValue": "\u6682\u65E0\u5185\u5BB9",
+  "wiki.proposedHeading": "\u62DF\u5199\u5165\u5185\u5BB9",
+  "wiki.stagedHint": "\u5148\u9010\u9879\u5BA1\u6838\u7ECF\u9A8C\u5E76\u4FDD\u5B58\uFF0C\u518D\u68C0\u67E5 Wiki \u4E2D\u7684\u76F8\u4F3C\u5185\u5BB9\u548C\u51B2\u7A81\u3002\u6700\u7EC8\u5199\u5165\u4ECD\u9700\u9884\u89C8\u5E76\u4EBA\u5DE5\u6279\u51C6\u3002",
+  "wiki.sessionStep": "\u4F1A\u8BDD\u505A\u4E86\u4EC0\u4E48",
+  "wiki.compareStep": "Wiki \u5BF9\u7167",
+  "wiki.writeStep": "\u9884\u89C8\u4E0E\u5199\u5165",
+  "wiki.experienceItems": "\u9010\u9879\u786E\u8BA4\u7ECF\u9A8C",
+  "wiki.noExperiences": "\u672C\u6B21\u4F1A\u8BDD\u672A\u53D1\u73B0\u503C\u5F97\u6C89\u6DC0\u7684\u7ECF\u9A8C\u3002",
+  "wiki.itemNote": "\u6211\u7684\u610F\u89C1",
+  "wiki.decision.pending": "\u5F85\u786E\u8BA4",
+  "wiki.decision.confirmed": "\u5DF2\u786E\u8BA4",
+  "wiki.decision.excluded": "\u4E0D\u6C89\u6DC0",
+  "wiki.action.confirmed": "\u786E\u8BA4\u8FD9\u6761",
+  "wiki.action.excluded": "\u4E0D\u6C89\u6DC0\u8FD9\u6761",
+  "wiki.startCompare": "\u68C0\u67E5 Wiki \u91CD\u590D\u4E0E\u51B2\u7A81",
+  "wiki.saveDecisionsHint": "\u8BF7\u9010\u6761\u9009\u62E9\u786E\u8BA4\u6216\u4E0D\u6C89\u6DC0\uFF0C\u586B\u5199\u610F\u89C1\u540E\u70B9\u51FB\u201C\u4FDD\u5B58\u4FEE\u6539\u201D\uFF0C\u518D\u5F00\u59CB Wiki \u5BF9\u7167\u3002",
+  "wiki.legacyNotice": "\u8FD9\u662F\u65E7\u6D41\u7A0B\u751F\u6210\u7684\u8BB0\u5F55\uFF0C\u5DF2\u5305\u542B Wiki \u5BF9\u7167\u3002\u70B9\u51FB\u201C\u63D0\u53D6\u7ECF\u9A8C\u201D\u53EF\u6309\u65B0\u7684\u9010\u9879\u786E\u8BA4\u6D41\u7A0B\u91CD\u65B0\u5206\u6790\u3002",
+  "wiki.empty": "\u6682\u65E0\u5206\u6790\u8BB0\u5F55\uFF0C\u70B9\u51FB\u201C\u63D0\u53D6\u7ECF\u9A8C\u201D\u5F00\u59CB\u3002",
+  "wiki.noChanges": "\u6CA1\u6709\u62DF\u5199\u5165\u5185\u5BB9",
+  "wiki.summary": "\u7ED3\u8BBA",
+  "wiki.scope": "\u9002\u7528\u8303\u56F4",
+  "wiki.evidence": "\u4F9D\u636E\uFF08\u542B\u4F1A\u8BDD\u6761\u76EE\uFF09",
+  "wiki.unverified": "\u672A\u9A8C\u8BC1\u4E8B\u9879",
+  "wiki.relation": "Wiki \u76F8\u4F3C\u4E0E\u51B2\u7A81\u5206\u6790",
+  "wiki.reviewNote": "\u6211\u7684\u5BA1\u6838\u610F\u89C1",
+  "wiki.proposedContent": "\u62DF\u4FEE\u6539\u5168\u6587\uFF1A{{path}}",
+  "wiki.previewHint": "\u8BF7\u68C0\u67E5\u5168\u90E8\u6587\u4EF6\u5DEE\u5F02\uFF1B\u5019\u9009\u6216\u9875\u9762\u53D8\u5316\u540E\u987B\u91CD\u65B0\u9884\u89C8\u3002\u6279\u51C6\u65F6\u8BF7\u907F\u514D\u5176\u4ED6\u7A0B\u5E8F\u540C\u65F6\u4FEE\u6539\u8FD9\u4E9B\u9875\u9762\u3002",
+  "wiki.back": "\u8FD4\u56DE\u5BA1\u6838",
+  "wiki.approve": "\u6279\u51C6\u5E76\u5199\u5165 Wiki",
+  "wiki.reject": "\u62D2\u7EDD\u5019\u9009",
+  "wiki.save": "\u4FDD\u5B58\u4FEE\u6539",
+  "wiki.preview": "\u67E5\u770B\u5199\u5165\u9884\u89C8",
+  "wiki.status.pending": "\u5F85\u5BA1\u6838",
+  "wiki.status.rejected": "\u5DF2\u62D2\u7EDD",
+  "wiki.status.written": "\u5DF2\u5199\u5165",
+  "workspace.lastObservedAt": "\u72B6\u6001\u6700\u540E\u89C2\u5BDF\uFF1A{{at}}",
+  "runtime.lastObservedApproval": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u7B49\u5F85\u7528\u6237\u6388\u6743",
+  "runtime.lastObservedInput": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u7B49\u5F85\u7528\u6237\u8F93\u5165",
   "runtime.lastObservedRunning": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u6267\u884C\u4E2D",
   "session.historicalCompleted": "\u5DF2\u5B8C\u6210\uFF08\u5386\u53F2\u5F52\u7C7B\uFF09",
   "board.pending": "\u5F85\u786E\u8BA4",
@@ -22802,8 +23105,8 @@ var zh_CN_default2 = {
   "state.manualExecuting": "\u6267\u884C\u4E2D",
   "runtime.queued": "\u7B49\u5F85\u6267\u884C",
   "runtime.running": "\u6B63\u5728\u6267\u884C",
-  "runtime.waitingApproval": "\u7B49\u5F85\u5BA1\u6279",
-  "runtime.waitingInput": "\u7B49\u5F85\u8F93\u5165",
+  "runtime.waitingApproval": "\u7B49\u5F85\u7528\u6237\u6388\u6743",
+  "runtime.waitingInput": "\u7B49\u5F85\u7528\u6237\u8F93\u5165",
   "runtime.interrupted": "\u5DF2\u4E2D\u65AD",
   "runtime.failed": "\u6267\u884C\u5931\u8D25",
   "runtime.pendingConfirmation": "\u5F85\u786E\u5B9A",
@@ -22811,8 +23114,8 @@ var zh_CN_default2 = {
   "runtime.unknown": "\u72B6\u6001\u672A\u786E\u8BA4",
   "runtime.planningQueued": "\u7B49\u5F85\u89C4\u5212",
   "runtime.planningRunning": "\u6B63\u5728\u89C4\u5212",
-  "runtime.planningApproval": "\u89C4\u5212\u7B49\u5F85\u5BA1\u6279",
-  "runtime.planningInput": "\u89C4\u5212\u7B49\u5F85\u8F93\u5165",
+  "runtime.planningApproval": "\u89C4\u5212\u7B49\u5F85\u7528\u6237\u6388\u6743",
+  "runtime.planningInput": "\u89C4\u5212\u7B49\u5F85\u7528\u6237\u8F93\u5165",
   "runtime.planningInterrupted": "\u89C4\u5212\u5DF2\u4E2D\u65AD",
   "runtime.planningFailed": "\u89C4\u5212\u5931\u8D25",
   "schedule.title": "\u6392\u671F\u4E0E\u4EFB\u52A1\u5F52\u5C5E",
@@ -23059,6 +23362,50 @@ var zh_CN_default2 = {
   "review.actualRevision": " \xB7 \u5B9E\u9645\u5BA1\u9605 r{{revision}}",
   "delete.title": "\u786E\u8BA4\u5220\u9664",
   "delete.hint": "\u53EA\u6709\u672A\u6267\u884C\u4E14\u6CA1\u6709\u5F15\u7528\u548C\u65F6\u95F4\u8BB0\u5F55\u7684\u6570\u636E\u53EF\u4EE5\u5220\u9664\u3002\u5DF2\u6709\u6267\u884C\u8BB0\u5F55\u7684\u4EFB\u52A1\u8BF7\u53D6\u6D88\u3002",
+  "session.summaryGenerate": "\u751F\u6210\u6982\u8981",
+  "session.summaryQueued": "\u6982\u8981\u5DF2\u52A0\u5165\u751F\u6210\u961F\u5217",
+  "session.summaryPending": "\u6982\u8981\u5C1A\u672A\u751F\u6210",
+  "session.summaryGenerating": "\u6B63\u5728\u751F\u6210\u4F1A\u8BDD\u6982\u8981\u2026",
+  "session.summaryFailed": "\u6982\u8981\u751F\u6210\u5931\u8D25\uFF0C\u7A0D\u540E\u81EA\u52A8\u91CD\u8BD5",
+  "session.summaryPartial": "\u6839\u636E\u4F1A\u8BDD\u90E8\u5206\u5185\u5BB9\u751F\u6210",
+  "session.summaryOutdated": "\u4F1A\u8BDD\u5DF2\u6709\u66F4\u65B0\uFF0C\u6982\u8981\u5F85\u5237\u65B0",
+  "batch.groupProjects": "\u6309\u9879\u76EE\u5206\u7EC4",
+  "batch.completeAll": "\u4E00\u952E\u5168\u90E8\u5B8C\u6210",
+  "batch.pendingRange": "\u5F85\u786E\u8BA4\u65F6\u95F4\u8303\u56F4",
+  "batch.completedRange": "\u5DF2\u5B8C\u6210\u65F6\u95F4\u8303\u56F4",
+  "batch.lastDays": "\u8FD1 {{count}} \u5929",
+  "batch.lastTwoDays": "\u8FD1 2 \u5929",
+  "batch.lastSevenDays": "\u8FD1 7 \u5929",
+  "batch.allTime": "\u5168\u90E8\u65F6\u95F4",
+  "batch.custom": "\u81EA\u5B9A\u4E49",
+  "batch.invalidRange": "\u5F00\u59CB\u65E5\u671F\u4E0D\u80FD\u665A\u4E8E\u7ED3\u675F\u65E5\u671F",
+  "batch.startDate": "\u5F00\u59CB\u65E5\u671F",
+  "batch.endDate": "\u7ED3\u675F\u65E5\u671F",
+  "batch.unknownCreated": "\u521B\u5EFA\u65F6\u95F4\u672A\u77E5",
+  "batch.created": "\u521B\u5EFA",
+  "batch.taskNotAccepted": "\u4F1A\u8BDD\u5DF2\u5F52\u6863\uFF0C\u4EFB\u52A1\u5C1A\u672A\u9A8C\u6536",
+  "batch.completeProject": "\u4E00\u952E\u5B8C\u6210\u5F85\u786E\u8BA4",
+  "batch.interrupted": "\u4E2D\u65AD\u6216\u5F02\u5E38",
+  "batch.title": "\u786E\u8BA4\u5B8C\u6210\u4F1A\u8BDD",
+  "batch.description": "\u5C06\u6240\u9009\u4F1A\u8BDD\u79FB\u81F3\u201C\u5DF2\u5B8C\u6210\u201D\uFF0C\u4E0D\u4F1A\u505C\u6B62\u6B63\u5728\u8FD0\u884C\u7684\u4F1A\u8BDD\uFF0C\u4E5F\u4E0D\u4F1A\u9A8C\u6536\u5173\u8054\u4EFB\u52A1\u3002",
+  "batch.selected": "\u5DF2\u9009\u62E9 {{count}} / {{total}} \u4E2A\u4F1A\u8BDD",
+  "batch.runningWarning": "\u6807\u8BB0\u5B8C\u6210\u4E0D\u4F1A\u505C\u6B62\u8FD0\u884C\u4E2D\u7684\u4F1A\u8BDD\uFF1B\u540E\u7EED\u6D3B\u52A8\u4F1A\u4F7F\u4F1A\u8BDD\u91CD\u65B0\u663E\u793A\u3002",
+  "batch.confirm": "\u786E\u8BA4\u5B8C\u6210\uFF08{{count}}\uFF09",
+  "batch.success": "\u5DF2\u5B8C\u6210 {{count}} \u4E2A\u4F1A\u8BDD",
+  "batch.result": "\u5DF2\u5B8C\u6210 {{succeeded}} \u4E2A\uFF0C\u672A\u5B8C\u6210 {{failed}} \u4E2A",
+  "batch.selectAll": "\u5168\u9009",
+  "batch.deselectAll": "\u53D6\u6D88\u5168\u9009",
+  "batch.statusSelection": "\u6309\u4F1A\u8BDD\u72B6\u6001\u9009\u62E9",
+  "batch.refreshState": "\u5237\u65B0\u72B6\u6001",
+  "batch.unknownFailure": "\u64CD\u4F5C\u672A\u5B8C\u6210\uFF0C\u8BF7\u5237\u65B0\u72B6\u6001\u540E\u91CD\u8BD5\u3002",
+  "batch.processing": "\u5904\u7406\u4E2D",
+  "batch.empty": "\u5F53\u524D\u8303\u56F4\u5185\u6CA1\u6709\u9700\u8981\u5904\u7406\u7684\u4F1A\u8BDD\u3002",
+  "batch.footerHint": "\u540E\u7EED\u6709\u65B0\u6D3B\u52A8\u65F6\uFF0C\u4F1A\u8BDD\u4F1A\u91CD\u65B0\u663E\u793A",
+  "batch.archive": "\u786E\u8BA4\u5F52\u6863",
+  "settings.sessionAge": "\u4F1A\u8BDD\u5C55\u793A\u8303\u56F4",
+  "settings.sessionAgeDays": "\u6700\u8FD1\u66F4\u65B0\u5929\u6570",
+  "settings.sessionAgeHint": "\u8F93\u5165 0 \u8868\u793A\u4E0D\u9650\u5236\uFF1B\u8D85\u8FC7\u5929\u6570\u7684\u4F1A\u8BDD\u5C06\u9690\u85CF\uFF0C\u6570\u636E\u4E0D\u4F1A\u5220\u9664\u3002\u65E0\u6CD5\u786E\u5B9A\u66F4\u65B0\u65F6\u95F4\u7684\u4F1A\u8BDD\u4ECD\u4F1A\u663E\u793A\u3002",
+  "settings.sessionAgeSaved": "\u4F1A\u8BDD\u5C55\u793A\u8303\u56F4\u5DF2\u4FDD\u5B58",
   "settings.language": "\u8BED\u8A00",
   "settings.followSystem": "\u8DDF\u968F\u7CFB\u7EDF",
   "settings.languageHint": "\u81EA\u52A8\u6A21\u5F0F\u4F18\u5148\u8DDF\u968F Codex \u5BBF\u4E3B\u8BED\u8A00\uFF0C\u5176\u6B21\u8DDF\u968F\u6D4F\u89C8\u5668\u8BED\u8A00\u3002",
@@ -23202,6 +23549,85 @@ function runtimeState(state) {
   return { waiting: "waiting_approval", ended: "completed" }[state ?? ""] || state || "unknown";
 }
 
+// src/experience-chat.ts
+var reportSchema = external_exports.object({
+  version: external_exports.literal(1),
+  sourceId: external_exports.string().uuid(),
+  threadId: external_exports.string().uuid(),
+  stage: external_exports.enum(["ready", "reading", "reviewing", "planning", "awaiting_approval", "writing", "checking", "completed", "no_knowledge", "failed"]),
+  summary: external_exports.string().max(300),
+  updatedAt: external_exports.iso.datetime({ offset: true })
+}).strict();
+function readExperienceReport(chat, now = Date.now()) {
+  let fd;
+  try {
+    if (!lstatSync(chat.progressPath).isFile()) return;
+    fd = openSync(chat.progressPath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    if (!fstatSync(fd).isFile()) return;
+    const data = Buffer.alloc(32769);
+    const bytes = readSync(fd, data, 0, data.length, 0);
+    if (bytes > 32768) return;
+    const report = reportSchema.parse(JSON.parse(data.subarray(0, bytes).toString("utf8")));
+    if (report.sourceId !== chat.sourceId || report.threadId !== chat.threadId || Date.parse(report.updatedAt) < Date.parse(chat.createdAt) || Date.parse(report.updatedAt) > now + 6e4) return;
+    return report;
+  } catch {
+    return;
+  } finally {
+    if (fd !== void 0) closeSync(fd);
+  }
+}
+function experienceProgress(chat, observation, report, now = Date.now()) {
+  const state = runtimeState(observation?.observedState);
+  const newerRun = observation?.experienceStartedAt && Date.parse(observation.experienceStartedAt) > Date.parse(report?.updatedAt ?? chat.createdAt);
+  const newerActivity = newerRun || observation && Date.parse(observation.observedAt) > Date.parse(report?.updatedAt ?? chat.createdAt) && ["running", "queued", "waiting_input", "waiting_approval", "failed", "interrupted"].includes(state);
+  const base = { threadId: chat.threadId, summary: report?.summary ?? "", updatedAt: observation && (!report || newerActivity) ? observation.observedAt : report?.updatedAt ?? chat.createdAt };
+  if (report && !newerActivity) {
+    if (report.stage === "completed") return { ...base, stage: report.stage, status: "reported_complete" };
+    if (report.stage === "no_knowledge") return { ...base, stage: report.stage, status: "no_knowledge" };
+    if (report.stage === "failed") return { ...base, stage: report.stage, status: "failed" };
+    if (["reviewing", "awaiting_approval"].includes(report.stage)) return { ...base, stage: report.stage, status: "waiting" };
+  }
+  const detail = { ...base, ...report && !newerActivity ? { stage: report.stage } : {}, ...newerActivity ? { summary: "" } : {} };
+  if (["running", "queued"].includes(state)) return { ...detail, status: Date.parse(observation.observedAt) + 18e5 < now ? "unknown" : "running" };
+  if (["waiting_input", "waiting_approval"].includes(state)) return { ...detail, status: "waiting" };
+  if (state === "failed" || state === "interrupted") return { ...detail, status: state };
+  if (observation?.turnId || observation && ["Stop", "SessionEnd", "task_complete", "turn_aborted"].includes(observation.event)) return { ...detail, status: "paused" };
+  return { ...detail, status: !observation || report?.stage === "ready" ? "ready" : "unknown" };
+}
+
+// src/experience-preparation.ts
+function preparationView(job) {
+  const { checkpoint: _checkpoint, ...view } = job;
+  return view;
+}
+
+// src/domain.ts
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync as mkdirSync2 } from "node:fs";
+import { dirname } from "node:path";
+import { randomUUID } from "node:crypto";
+
+// src/wiki-agent-state.ts
+import { isAbsolute, join as join2, relative, resolve as resolve2, sep } from "node:path";
+
+// src/paths.ts
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+var dataDir = resolve(process.env.AI_TODOS_DATA_DIR || join(homedir(), ".ai-todos"));
+var dbPath = join(dataDir, "ai-todos.sqlite");
+var runtimePath = join(dataDir, "runtime.json");
+var port = Number(process.env.AI_TODOS_PORT || 16943);
+if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("AI_TODOS_PORT must be an integer between 1024 and 65535");
+var origin = `http://127.0.0.1:${port}`;
+
+// src/wiki-agent-state.ts
+var wikiAgentRoot = join2(dataDir, "wiki-agent", "tasks");
+function isWikiAgentCwd(cwd) {
+  if (!cwd) return false;
+  const path = relative(wikiAgentRoot, resolve2(cwd));
+  return path === "" || !isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`);
+}
+
 // src/domain.ts
 var text = external_exports.string().trim().min(1).max(300);
 var note = external_exports.string().max(2e4);
@@ -23219,7 +23645,7 @@ var schemas = {
 };
 var kinds = external_exports.enum(Object.keys(schemas));
 var revision = external_exports.number().int().positive();
-var settingsSchema = external_exports.object({ reminders: external_exports.boolean(), followUpMinutes: external_exports.number().int().min(0).max(10080), reviewTime: external_exports.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(), timezone: external_exports.string().refine((v) => {
+var settingsSchema = external_exports.object({ sessionMaxAgeDays: external_exports.number().int().min(0).max(36500).optional(), reminders: external_exports.boolean(), followUpMinutes: external_exports.number().int().min(0).max(10080), reviewTime: external_exports.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(), timezone: external_exports.string().refine((v) => {
   try {
     new Intl.DateTimeFormat("en", { timeZone: v });
     return true;
@@ -23243,7 +23669,7 @@ var commandSchema = external_exports.discriminatedUnion("action", [
 ]);
 var reviewSchema = external_exports.object({ id, revision, decision: external_exports.enum(["accept", "reject"]), confirmed: external_exports.literal(true), reviewer: text, note: note.default("") }).strict();
 var taskCompleteSchema = reviewSchema.pick({ id: true, revision: true, confirmed: true });
-var sessionConfirmSchema = external_exports.object({ id, observedAt: date5, event: external_exports.string().min(1).max(200), turnId: external_exports.string().max(200).nullable(), catalogUpdatedAt: date5.nullable(), confirmed: external_exports.literal(true) }).strict();
+var sessionConfirmSchema = external_exports.object({ id, observedAt: date5, event: external_exports.string().min(1).max(200), turnId: external_exports.string().max(200).nullable(), catalogUpdatedAt: date5.nullable(), confirmed: external_exports.literal(true), archive: external_exports.literal(true).optional() }).strict();
 var DomainError = class extends Error {
   constructor(code, status = 400, params = {}) {
     super(i18n.t(code, { ...params, lng: "zh-CN" }));
@@ -23269,7 +23695,7 @@ function recordSessionActivity(session, previous, state, at, event, turnId) {
 }
 var Store = class {
   constructor(path, now = () => Date.now()) {
-    mkdirSync(dirname(path), { recursive: true, mode: 448 });
+    mkdirSync2(dirname(path), { recursive: true, mode: 448 });
     this.db = new DatabaseSync(path);
     this.now = now;
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
@@ -23333,16 +23759,76 @@ var Store = class {
     return this.meta("focus", { revision: 0, taskId: null, status: "idle", elapsedMs: 0, startedAt: null, segments: [] });
   }
   settings() {
-    return this.meta("settings", { revision: 0, reminders: true, followUpMinutes: 60, reviewTime: "18:00", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+    return { sessionMaxAgeDays: 2, ...this.meta("settings", { revision: 0, reminders: true, followUpMinutes: 60, reviewTime: "18:00", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }) };
+  }
+  /** 注册内部整理线程；关联持久化后，即使线程工作目录变化也不会成为业务会话。 */
+  registerBackgroundSession(threadId, jobId) {
+    this.setMeta(`wiki.agent.${threadId}`, { jobId });
+  }
+  /** 通过持久身份和私有工作目录双重识别后台线程。 */
+  isBackgroundSession(threadId, cwd) {
+    return isWikiAgentCwd(cwd) || this.meta(`wiki.agent.${threadId}`, null) !== null;
+  }
+  /** 记录原会话与沉淀聊天的关联；沉淀聊天不进入普通业务列表。 */
+  registerExperienceChat(chat) {
+    this.transaction(() => {
+      this.setMeta(`experience.chat.${chat.sourceId}`, chat);
+      this.setMeta(`experience.thread.${chat.threadId}`, chat.sourceId);
+      this.registerBackgroundSession(chat.threadId, `experience:${chat.sourceId}`);
+    });
+  }
+  /** 获取所有已准备的沉淀聊天，供宿主状态同步使用。 */
+  experienceChats() {
+    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.chat.%'").all().map((row) => JSON.parse(row.body));
+  }
+  /** 读取后台准备的持久化状态，供卡片投影及服务重启恢复使用。 */
+  experiencePreparations() {
+    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.preparation.%'").all().map((row) => JSON.parse(row.body));
+  }
+  /** 查询沉淀会话的可信关联，不根据标题或路径猜测身份。 */
+  experienceChatForThread(id2) {
+    const sourceId = this.meta(`experience.thread.${id2}`, null);
+    return sourceId ? this.meta(`experience.chat.${sourceId}`, null) : null;
+  }
+  /** 查询沉淀聊天是否已有真实轮次；开始记录、可信轮次标识和已核实结果均可跨重启复用。 */
+  experienceChatHasStarted(threadId) {
+    const row = this.db.prepare("SELECT body FROM sessions WHERE id=?").get(threadId);
+    const session = row ? JSON.parse(row.body) : null;
+    return !!session?.experienceStartedAt || !!session?.turnId || this.meta(`experience.started.${threadId}`, false);
+  }
+  /** 同步沉淀聊天的原生状态；保留较新的 hook 观察，只供源卡片显示进度。 */
+  syncExperienceChat(thread) {
+    const row = this.db.prepare("SELECT body FROM sessions WHERE id=?").get(thread.id);
+    const previous = row ? JSON.parse(row.body) : null;
+    const at = thread.observation?.observedAt ?? thread.updatedAt;
+    if (previous && (thread.state === "unknown" || previous.source === "codex-hook" && Date.parse(previous.observedAt) > Date.parse(at))) return;
+    const observation = { ...previous, id: thread.id, cwd: thread.cwd, title: thread.title, observedState: thread.state, observedAt: at, event: "thread/list", source: "codex-app-server", catalogVisible: false, ...thread.observation };
+    const active = ["running", "queued", "waiting_input", "waiting_approval"];
+    const turnId = thread.observation?.turnId;
+    const changedTurn = turnId && previous?.turnId ? turnId !== previous.turnId : !previous || !active.includes(previous.observedState);
+    if (["running", "queued"].includes(thread.state) && changedTurn && !thread.observation?.experienceStartedAt) observation.experienceStartedAt = at;
+    else if (turnId && previous?.turnId && turnId !== previous.turnId && !thread.observation?.experienceStartedAt && Date.parse(at) > Date.parse(previous.observedAt)) {
+      observation.experienceStartedAt = at;
+    }
+    this.db.prepare("INSERT OR REPLACE INTO sessions VALUES (?,?)").run(thread.id, JSON.stringify(observation));
   }
   sessions() {
-    return this.db.prepare("SELECT body FROM sessions ORDER BY rowid DESC").all().map((r) => {
-      const s = JSON.parse(r.body);
+    const stored = this.db.prepare("SELECT body FROM sessions ORDER BY rowid DESC").all().map((r) => JSON.parse(r.body));
+    const observations = new Map(stored.map((s) => [s.id, s]));
+    const chats = new Map(this.experienceChats().map((chat) => [chat.sourceId, chat]));
+    const preparations = new Map(this.experiencePreparations().map((job) => [job.sourceId, preparationView(job)]));
+    return stored.filter((s) => !this.isBackgroundSession(s.id, s.cwd)).map((s) => {
       const state = runtimeState(s.observedState);
       const age = this.now() - Date.parse(s.observedAt);
       const extendedRunning = state === "running" && s.source === "codex-rollout" && s.event === "task_started";
-      const expired = ["queued", "running", "waiting_approval", "waiting_input"].includes(state) && age > (extendedRunning ? 18e5 : 3e5);
-      return { ...s, state: expired ? "unknown" : state, ...!expired && extendedRunning && age > 3e5 ? { stateConfidence: "last_observed" } : {} };
+      const pendingUser = ["waiting_approval", "waiting_input"].includes(state) && ["codex-hook", "codex-app-server", "codex-rollout"].includes(s.source) && Number.isFinite(age);
+      const expired = ["queued", "running", "waiting_approval", "waiting_input"].includes(state) && !pendingUser && age > (extendedRunning ? 18e5 : 3e5);
+      const chat = chats.get(s.id);
+      const summary = this.meta(`session.summary.${s.id}`, null);
+      const summaryStatus = this.meta(`session.summary-status.${s.id}`, "");
+      const experiencePreparation = preparations.get(s.id);
+      const experience = chat ? experienceProgress(chat, observations.get(chat.threadId) ?? null, readExperienceReport(chat, this.now()), this.now()) : void 0;
+      return { ...s, ...summary ? { summary } : {}, ...summaryStatus ? { summaryStatus } : {}, ...experiencePreparation ? { experiencePreparation } : {}, ...experience ? { experience } : {}, state: expired ? "unknown" : state, ...!expired && (extendedRunning || pendingUser) && age > 3e5 ? { stateConfidence: "last_observed" } : {} };
     });
   }
   snapshot() {
@@ -23432,9 +23918,12 @@ var Store = class {
     });
   }
   syncCodexThreads(threads, complete = true) {
+    const internal = threads.filter((thread) => this.isBackgroundSession(thread.id, thread.cwd));
+    for (const thread of internal) if (this.experienceChatForThread(thread.id)) this.syncExperienceChat(thread);
+    threads = threads.filter((thread) => !this.isBackgroundSession(thread.id, thread.cwd));
     return this.transaction(() => {
       const existing = new Map(this.sessions().map((session) => {
-        const { state, stateConfidence, ...stored } = session;
+        const { state, stateConfidence, experience, experiencePreparation, summary, summaryStatus, ...stored } = session;
         return [session.id, preserveConfirmation(stored)];
       }));
       const seen = /* @__PURE__ */ new Set();
@@ -23443,13 +23932,19 @@ var Store = class {
         if (seen.has(thread.id)) continue;
         seen.add(thread.id);
         const previous = existing.get(thread.id);
-        const session = { ...previous, id: thread.id, title: thread.title, preview: thread.preview, cwd: thread.cwd, codexProjectId: thread.projectId, catalogUpdatedAt: thread.updatedAt, catalogVisible: true };
-        if (previous?.catalogUpdatedAt && Date.parse(thread.updatedAt) > Date.parse(previous.catalogUpdatedAt)) delete session.confirmedAt;
+        const session = { ...previous, id: thread.id, title: thread.title, preview: thread.preview, cwd: thread.cwd, codexProjectId: thread.projectId, catalogCreatedAt: thread.createdAt ?? previous?.catalogCreatedAt, catalogUpdatedAt: thread.updatedAt, catalogVisible: true };
+        if (previous?.catalogUpdatedAt && Date.parse(thread.updatedAt) > Date.parse(previous.catalogUpdatedAt)) {
+          delete session.confirmedAt;
+          delete session.archiveConfirmed;
+        }
         const observation = thread.observation;
         const retainHook = observation && previous?.source === "codex-hook" && (Date.parse(previous.observedAt) > Date.parse(observation.observedAt) || thread.state === "running" && ["waiting_approval", "waiting_input"].includes(runtimeState(previous.observedState)) && previous.turnId === observation.turnId);
         if (!retainHook && (thread.state !== "unknown" || !previous)) {
           Object.assign(session, { observedState: thread.state, observedAt: this.at(), event: "thread/list", source: "codex-app-server", ...observation });
-          if (!["idle", "completed"].includes(runtimeState(thread.state)) || observation && observation.turnId !== previous?.turnId) delete session.confirmedAt;
+          if (!["idle", "completed"].includes(runtimeState(thread.state)) && (!previous?.archiveConfirmed || runtimeState(thread.state) !== runtimeState(previous.observedState)) || observation && observation.turnId !== previous?.turnId) {
+            delete session.confirmedAt;
+            delete session.archiveConfirmed;
+          }
         }
         if (!retainHook && (thread.state !== "unknown" || observation)) recordSessionActivity(session, previous ?? null, runtimeState(session.observedState), observation?.observedAt ?? thread.updatedAt, session.event, session.turnId);
         if (JSON.stringify(session) === JSON.stringify(previous)) continue;
@@ -23535,7 +24030,7 @@ var Store = class {
       if (c.action === "focus") return this.changeFocus(c);
       if (c.action === "settings") {
         this.check(this.settings(), c.revision);
-        return this.setMeta("settings", { ...c.data, revision: c.revision + 1 });
+        return this.setMeta("settings", { ...this.settings(), ...c.data, revision: c.revision + 1 });
       }
       if (c.action === "ack") {
         const row = this.db.prepare("SELECT body FROM notices WHERE id=?").get(c.id);
@@ -23630,10 +24125,13 @@ var Store = class {
       requireThat(row, "errors.sessionMissing", 404);
       let session = preserveConfirmation(JSON.parse(row.body));
       requireThat(session.observedAt === c.observedAt && session.event === c.event && (session.turnId ?? null) === c.turnId && (session.catalogUpdatedAt ?? null) === c.catalogUpdatedAt, "errors.staleSession", 409);
-      requireThat(["idle", "completed"].includes(runtimeState(session.observedState)), "errors.confirmState");
-      requireThat(!this.all("task").some((task) => task.sessionId === c.id && task.state !== "cancelled"), "errors.taskAcceptance");
+      if (!c.archive) {
+        requireThat(["idle", "completed"].includes(runtimeState(session.observedState)), "errors.confirmState");
+        requireThat(!this.all("task").some((task) => task.sessionId === c.id && task.state !== "cancelled"), "errors.taskAcceptance");
+      }
       if (!session.confirmedAt) {
         session.confirmedAt = this.at();
+        if (c.archive) session.archiveConfirmed = true;
         session = preserveConfirmation(session);
         recordSessionActivity(session, session, "confirmed", session.confirmedAt, "human_confirmation", session.turnId);
         this.db.prepare("UPDATE sessions SET body=? WHERE id=?").run(JSON.stringify(session), session.id);
@@ -23695,7 +24193,11 @@ var Store = class {
       if (["Stop", "Interrupt"].includes(event.hook_event_name) && previous?.turnId && event.turn_id && previous.turnId !== event.turn_id) return previous;
       const states = { SessionStart: "idle", UserPromptSubmit: "running", PreToolUse: "running", PostToolUse: "running", PermissionRequest: "waiting_approval", Stop: "idle", Interrupt: "interrupted", SessionEnd: "completed" };
       const session = { ...previous, id: event.session_id, cwd: event.cwd, observedState: states[event.hook_event_name], observedAt: this.at(), event: event.hook_event_name, turnId: event.turn_id ?? previous?.turnId ?? null, source: "codex-hook" };
-      if (!["SessionStart", "Stop", "SessionEnd"].includes(event.hook_event_name) || session.turnId !== previous?.turnId) delete session.confirmedAt;
+      if (!["SessionStart", "Stop", "SessionEnd"].includes(event.hook_event_name) || session.turnId !== previous?.turnId) {
+        delete session.confirmedAt;
+        delete session.archiveConfirmed;
+      }
+      if (event.hook_event_name === "UserPromptSubmit" && this.experienceChatForThread(session.id)) session.experienceStartedAt = session.observedAt;
       recordSessionActivity(session, previous, session.observedState, session.observedAt, session.event, session.turnId);
       this.db.prepare("INSERT OR REPLACE INTO sessions VALUES (?,?)").run(session.id, JSON.stringify(session));
       if (event.hook_event_name === "UserPromptSubmit") this.reopenAcceptedTask(session.id, session.observedAt, event.turn_id, previous?.turnId);
@@ -23703,16 +24205,6 @@ var Store = class {
     });
   }
 };
-
-// src/paths.ts
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-var dataDir = resolve(process.env.AI_TODOS_DATA_DIR || join(homedir(), ".ai-todos"));
-var dbPath = join(dataDir, "ai-todos.sqlite");
-var runtimePath = join(dataDir, "runtime.json");
-var port = Number(process.env.AI_TODOS_PORT || 16943);
-if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("AI_TODOS_PORT must be an integer between 1024 and 65535");
-var origin = `http://127.0.0.1:${port}`;
 
 // hooks/observe.ts
 var input2 = "";
@@ -23728,9 +24220,14 @@ try {
     const session = store.observe(event);
     let output2 = {};
     if (event.hook_event_name === "SessionStart" || event.hook_event_name === "UserPromptSubmit") {
-      const task = store.all("task").find((task2) => task2.sessionId === session.id && task2.state !== "cancelled");
-      const context = task ? `\u5DF2\u5173\u8054\u539F\u4EFB\u52A1 taskId=${task.id}\u3002\u4F7F\u7528 ai-todos \u6280\u80FD\uFF0C\u5148\u8C03\u7528 ai_todos_task \u8BFB\u53D6\u5F53\u524D\u4EFB\u52A1\u4E0E\u9A8C\u6536\u6807\u51C6\uFF0C\u590D\u7528\u5DF2\u6709\u7ED1\u5B9A\uFF1B\u4EC5\u6309\u7528\u6237\u8BF7\u6C42\u63A8\u8FDB\u3002` : "\u53EF\u7528 ai_todos_snapshot \u67E5\u8BE2\u540E\u7ED1\u5B9A\u539F\u4EFB\u52A1\u3002";
-      output2 = { hookSpecificOutput: { hookEventName: event.hook_event_name, additionalContext: `ai-todos \u53EF\u4FE1 Codex sessionId=${session.id}\u3002${context}Stop \u4EC5\u7ED3\u675F\u4E00\u8F6E\uFF0C\u771F\u5B9E\u4EA4\u4ED8\u9700\u8BC1\u636E\uFF0C\u4EBA\u9A8C\u6536\u9700\u660E\u786E\u786E\u8BA4\u3002` } };
+      const experience = store.experienceChatForThread(session.id);
+      if (experience) {
+        output2 = { hookSpecificOutput: { hookEventName: event.hook_event_name, additionalContext: `\u8FD9\u662F\u539F\u4F1A\u8BDD ${experience.sourceId} \u7684\u7ECF\u9A8C\u6C89\u6DC0\u804A\u5929\u3002\u4EFB\u52A1\u8BF4\u660E\u4F4D\u4E8E ${experience.contextPath}\u3002\u4EC5\u6309\u7528\u6237\u5F53\u524D\u6307\u4EE4\u63A8\u8FDB\uFF0C\u5728\u6C89\u6DC0\u804A\u5929\u5185\u786E\u8BA4\u7ECF\u9A8C\u548C\u6B63\u5F0F Wiki \u5199\u5165\uFF1B\u4E0D\u8981\u65B0\u5EFA\u6216\u7ED1\u5B9A\u4E1A\u52A1\u5F85\u529E\u3002\u8FDB\u5EA6\u6587\u4EF6\uFF1A${experience.progressPath}\u3002Stop \u4EC5\u8868\u793A\u4E00\u8F6E\u7ED3\u675F\u3002` } };
+      } else {
+        const task = store.all("task").find((task2) => task2.sessionId === session.id && task2.state !== "cancelled");
+        const context = task ? `\u5DF2\u5173\u8054\u539F\u4EFB\u52A1 taskId=${task.id}\u3002\u4F7F\u7528 ai-todos \u6280\u80FD\uFF0C\u5148\u8C03\u7528 ai_todos_task \u8BFB\u53D6\u5F53\u524D\u4EFB\u52A1\u4E0E\u9A8C\u6536\u6807\u51C6\uFF0C\u590D\u7528\u5DF2\u6709\u7ED1\u5B9A\uFF1B\u4EC5\u6309\u7528\u6237\u8BF7\u6C42\u63A8\u8FDB\u3002` : "\u53EF\u7528 ai_todos_snapshot \u67E5\u8BE2\u540E\u7ED1\u5B9A\u539F\u4EFB\u52A1\u3002";
+        output2 = { hookSpecificOutput: { hookEventName: event.hook_event_name, additionalContext: `ai-todos \u53EF\u4FE1 Codex sessionId=${session.id}\u3002${context}Stop \u4EC5\u7ED3\u675F\u4E00\u8F6E\uFF0C\u771F\u5B9E\u4EA4\u4ED8\u9700\u8BC1\u636E\uFF0C\u4EBA\u9A8C\u6536\u9700\u660E\u786E\u786E\u8BA4\u3002` } };
+      }
     }
     process.stdout.write(JSON.stringify(output2));
   } finally {

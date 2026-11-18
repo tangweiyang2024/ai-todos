@@ -13,7 +13,12 @@ const planningLabels: Record<string, TranslationKey> = {
 };
 export function runtimeLabel(runtime?: { state?: string; mode?: string; stateConfidence?: string } | null) {
   if (!runtime) return undefined;
-  if (runtime.stateConfidence === 'last_observed' && runtimeState(runtime.state) === 'running') return i18n.t('runtime.lastObservedRunning');
+  if (runtime.stateConfidence === 'last_observed') {
+    const state = runtimeState(runtime.state);
+    if (state === 'running') return i18n.t('runtime.lastObservedRunning');
+    if (state === 'waiting_approval') return i18n.t('runtime.lastObservedApproval');
+    if (state === 'waiting_input') return i18n.t('runtime.lastObservedInput');
+  }
   const key = (runtime.mode === 'planning' ? planningLabels : runtimeLabels)[runtimeState(runtime.state)];
   return key ? i18n.t(key) : undefined;
 }

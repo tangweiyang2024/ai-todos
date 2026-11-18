@@ -250,3 +250,18 @@ test('long-running rollout shows stale observation for a limited time without as
   assert.equal(s.sessions()[0].state, 'unknown');
   assert.equal(s.sessions()[0].stateConfidence, undefined);
 });
+
+test('waiting for authorization remains visible when observations grow stale and clears on tool completion', t => {
+  const { store: s, advance } = fixture(t); const id = randomUUID();
+  s.observe({ session_id: id, cwd: '/tmp', hook_event_name: 'UserPromptSubmit', turn_id: 'turn' });
+  s.observe({ session_id: id, cwd: '/tmp', hook_event_name: 'PermissionRequest', turn_id: 'turn' });
+  advance(3600000);
+  let session = s.sessions().find(x => x.id === id);
+  assert.equal(session.state, 'waiting_approval');
+  assert.equal(session.stateConfidence, 'last_observed');
+  assert.equal(s.snapshot().sessions.find(x => x.id === id).state, 'waiting_approval');
+  s.observe({ session_id: id, cwd: '/tmp', hook_event_name: 'PostToolUse', turn_id: 'turn' });
+  session = s.sessions().find(x => x.id === id);
+  assert.equal(session.state, 'running');
+  assert.equal(session.stateConfidence, undefined);
+});

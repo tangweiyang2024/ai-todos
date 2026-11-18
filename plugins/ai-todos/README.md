@@ -79,6 +79,16 @@ Keep using the same plugin source, `ai-todos@ai-todos`. The hook settings may sh
 - **Settings:** choose Automatic, Simplified Chinese, or English, Language changes apply immediately; your content stays in its original language.
 
 
+## Capture experience from a chat
+
+Select **Capture experience** on a source session or task card to prepare a dedicated Codex conversation in the background. The card shows progress, and a notice appears when it is ready. Choose **Open experience conversation** or **Later**; preparation never switches windows automatically. In the conversation, choose a model and send the prepared prompt. **Continue experience** reuses that conversation; it does not prefill another prompt after a real turn exists.
+
+ai-todos prepares an immutable source snapshot and task instructions, keeps the source-to-conversation association, and displays progress. Codex handles knowledge extraction, discussion, Wiki duplicate/conflict checks, the local wiki-ingest workflow, diffs, and writing. The prompt requires reading the local skill and Vault rules, presenting proposed changes, and waiting for explicit approval. In a normal conversation this is an instruction boundary, not the legacy browser ticket enforcement.
+
+Cards distinguish running, waiting for input, a turn ending, and “Conversation reports ingested.” Stop alone never establishes ingest success. Detailed phases are reported by the conversation; unavailable status remains unknown. Processing conversations do not create ordinary board cards. New activity invalidates previous completion reports.
+
+Private JSONL source snapshots and indexes live in dataDir/experience-chats, rather than the deep-link URL. Configure `AI_TODOS_WIKI_ROOT`, `AI_TODOS_VAULT_ROOT`, or `AI_TODOS_WIKI_INGEST_SKILL` as needed. Existing candidates and review history remain available. See [Conversation handoff](docs/experience-chat-handoff.md).
+
 ## Run from source
 
 Requires Node.js 24+ and npm.

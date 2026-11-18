@@ -25,7 +25,7 @@ export interface TaskCallbacks {
   onOpenCodex: (task: Task) => Promise<boolean>;
   onTransition: (id: string, revision: number, state: TransitionState, close?: boolean) => Promise<boolean>;
   onReschedule: (task: Task, dates: { plannedStart: string; plannedEnd: string } | { plannedStart: null; plannedEnd: null }) => Promise<boolean>;
-  onConfirmSession: (session: Pick<LiveSession, 'id' | 'observedAt' | 'event' | 'turnId' | 'catalogUpdatedAt'>, silent?: boolean) => Promise<boolean>;
+  onConfirmSession: (session: Pick<LiveSession, 'id' | 'observedAt' | 'event' | 'turnId' | 'catalogUpdatedAt'>, silent?: boolean, archive?: boolean) => Promise<boolean>;
 }
 export interface TaskEditorProps {
   task?: Partial<Task>; history?: TaskEvent[]; snapshot: Snapshot; busy: boolean;

@@ -24,7 +24,7 @@ createInterface({ input: process.stdin }).on('line', line => {
   const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, AI_TODOS_DATA_DIR: dir, AI_TODOS_PORT: String(port) };
   const oldToken = randomUUID(); let oldStopped = false;
   const oldService = createHttpServer((req, res) => {
-    if (req.url === '/health') { res.end(JSON.stringify({ name: 'ai-todos', version: '0.1.3' })); return; }
+    if (req.url === '/health') { res.end(JSON.stringify({ name: 'ai-todos', version: JSON.parse(readFileSync('package.json', 'utf8')).version })); return; }
     if (req.headers.authorization !== `Bearer ${oldToken}`) { res.writeHead(401); res.end(); return; }
     if (req.url === '/internal/ping') { res.end(JSON.stringify({ ok: true })); return; }
     if (req.url === '/internal/stop') { oldStopped = true; res.setHeader('connection', 'close'); res.end(JSON.stringify({ ok: true })); oldService.close(); oldService.closeIdleConnections(); return; }
@@ -44,10 +44,11 @@ createInterface({ input: process.stdin }).on('line', line => {
   await client.connect(transport);
   assert.equal(oldStopped, true);
   assert.equal((await fetch(`${origin}/health`).then(response => response.json())).version, JSON.parse(readFileSync('package.json', 'utf8')).version);
-  const tools = await client.listTools(); assert.equal(tools.tools.length, 8);
+  const tools = await client.listTools(); assert.equal(tools.tools.length, 9);
   assert.equal(tools.tools.find(tool => tool.name === 'ai_todos_snapshot').inputSchema.properties.syncThreads.type, 'boolean');
   assert.deepEqual(tools.tools.find(tool => tool.name === 'ai_todos_confirm_session')._meta.ui.visibility, ['app']);
   assert.deepEqual(tools.tools.find(tool => tool.name === 'ai_todos_complete_task')._meta.ui.visibility, ['app']);
+  assert.deepEqual(tools.tools.find(tool => tool.name === 'ai_todos_wiki')._meta.ui.visibility, ['app']);
   assert.ok(!tools.tools.some(t => /accept|review/.test(t.name)));
   const open = tools.tools.find(t => t.name === 'ai_todos_open'); assert.deepEqual(open._meta['openai/ui'].entrypoints, [{ type: 'global' }, { type: 'thread' }]);
   const resources = await client.listResources(); assert.equal(resources.resources[0].uri, 'ui://ai-todos/app.html');

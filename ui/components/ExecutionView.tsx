@@ -1,23 +1,23 @@
+import { ExperienceProgress } from './ExperienceProgress.tsx';
+import { ExperienceCaptureButton } from './ExperienceCaptureButton.tsx';
+import { SessionSummary } from './SessionSummary.tsx';
+import { SessionProjectGroups } from './SessionProjectGroups.tsx';
 import { useTranslation } from 'react-i18next';
 import { getLocale } from '../i18n.ts';
 // Adapted from Xinmo Desktop ExecutionView.tsx: callbacks replace desktop backend calls.
 import type { CSSProperties, DragEvent, PointerEvent } from 'react';
 import type { Task, Project, LiveSession } from '../../src/types.ts';
 import type { TaskCallbacks, RescheduleEdge } from '../types.ts';
-import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, ListTodo, ExternalLink, Check, CheckCheck, LoaderCircle, Code2, Play } from 'lucide-react';
+import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, ListTodo, ExternalLink, Check, CheckCheck, LoaderCircle, Code2, Play, CircleAlert } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { fmt, labels, priorityLabels, runtimeLabel } from '../format.ts';
 import { runtimeState } from '../../src/runtime.ts';
-import { boardColumns, executionColumnForTask, executionColumnForSession as sessionColumn, taskStatus, taskNextStep, canConfirmAiSession, boardDropDecision, isHistoricalSession } from '../execution-board.ts';
+import { boardColumns, executionColumnForTask, executionColumnForSession as sessionColumn, taskStatus, taskNextStep, canConfirmAiSession, boardDropDecision, isHistoricalSession, runtimeAttention } from '../execution-board.ts';
+import { userActionPriority, sessionLastActivity } from '../session-list.ts';
 import { tasksInTimelineWindow, tasksOutsideTimelineWindow, timelineAxisColumnWidths, timelineWindowForTasks } from '../timeline-window.ts';
 export { boardColumns, sessionColumn };
 
-function lastActivity(session?: LiveSession | null, fallback?: string) {
-  if (!session) return fallback;
-  const observed = session.source === 'codex-app-server' ? undefined : session.observedAt;
-  return [session.catalogUpdatedAt, observed, fallback].filter((value): value is string => !!value).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
-}
 
 export function AiBadge({ task }: { task: Pick<Task, 'ai' | 'sessionId'> }) {
   const { t } = useTranslation();
@@ -26,15 +26,18 @@ export function AiBadge({ task }: { task: Pick<Task, 'ai' | 'sessionId'> }) {
   </span>;
 }
 
-interface ExecutionCardProps extends Pick<TaskCallbacks, 'onOpenTask'>, Partial<Pick<TaskCallbacks, 'onOpenSession' | 'onReviewTask' | 'onOpenCodex' | 'onCompleteTask'>> { task: Task; projects: Project[]; busy: boolean; onDragStart?: (event: DragEvent, task: Task) => void; onDragEnd?: () => void }
+interface ExecutionCardProps extends Pick<TaskCallbacks, 'onOpenTask'>, Partial<Pick<TaskCallbacks, 'onOpenSession' | 'onReviewTask' | 'onOpenCodex' | 'onCompleteTask'>> { onExperience?: (id: string) => void; onSummary?: (id: string) => void; onArchive?: (session: LiveSession) => void; task: Task; projects: Project[]; busy: boolean; onDragStart?: (event: DragEvent, task: Task) => void; onDragEnd?: () => void }
 
-export function ExecutionCard({ task, projects, busy, onOpenTask, onOpenSession, onReviewTask, onOpenCodex, onCompleteTask, onDragStart, onDragEnd }: ExecutionCardProps) {
+/** 渲染任务在看板中的状态和可用操作。 */
+export function ExecutionCard({ task, projects, busy, onOpenTask, onOpenSession, onReviewTask, onOpenCodex, onCompleteTask, onExperience, onSummary, onArchive, onDragStart, onDragEnd }: ExecutionCardProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const dragged = useRef(false);
   const contentId = useId();
+  // 根据任务与会话运行状态确定操作和视觉提示。
   const column = executionColumnForTask(task), status = taskStatus(task), next = taskNextStep(task);
-  return <article className="execution-card execution-task-card" draggable={!!onDragStart && !busy && !['accepted', 'cancelled'].includes(task.state) && boardColumns.some(target => boardDropDecision(task, target.dropTarget).action)}
+  const attention = !['accepted', 'cancelled'].includes(task.state) ? runtimeAttention(task.ai) : undefined;
+  return <article className={`execution-card execution-task-card ${attention ? `needs-${attention}` : ''}`} draggable={!!onDragStart && !busy && !['accepted', 'cancelled'].includes(task.state) && boardColumns.some(target => boardDropDecision(task, target.dropTarget).action)}
     onClick={event => {
       if (!busy && !dragged.current && !(event.target as HTMLElement).closest('button, a, input, textarea, select, summary')) onOpenTask(task.id);
     }}
@@ -44,13 +47,19 @@ export function ExecutionCard({ task, projects, busy, onOpenTask, onOpenSession,
       <button type="button" className="execution-card__title" disabled={busy} aria-label={t("task.openDetails", { title: task.title })} onClick={() => { if (!dragged.current) onOpenTask(task.id); }}><strong title={task.title}>{task.title}</strong></button>
       <button type="button" className="execution-card__expand" disabled={busy} aria-label={t("task.expand", { title: task.title })} aria-expanded={expanded} aria-controls={contentId} onClick={() => { if (!dragged.current) setExpanded(value => !value); }}><ChevronDown size={14} aria-hidden="true" /></button>
     </div>
-    {(task.description || task.ai?.preview) && <p className="execution-card__preview">{task.description || task.ai?.preview}</p>}
-    <small className="execution-card__activity">{t("card.lastActivity", { at: fmt(lastActivity(task.ai, task.updatedAt)) })}</small>
+    {task.ai?.archiveConfirmed && task.state !== 'accepted' && <small className="execution-card__activity">{t('batch.taskNotAccepted')}</small>}
+    {task.ai && <small className="execution-card__activity">{t('batch.created')} {task.ai.catalogCreatedAt ? fmt(task.ai.catalogCreatedAt) : t('batch.unknownCreated')}</small>}
+    {task.ai ? <SessionSummary session={task.ai} onGenerate={onSummary} /> : task.description && <p className="execution-card__preview">{task.description}</p>}
+    <small className="execution-card__activity">{t("card.lastActivity", { at: fmt(sessionLastActivity(task.ai, task.ai ? undefined : task.updatedAt)) })}</small>
+    {task.ai?.stateConfidence === 'last_observed' && <small className="execution-card__activity">{t('workspace.lastObservedAt', { at: fmt(task.ai.observedAt) })}</small>}
+    <ExperienceProgress value={task.ai?.experience} preparation={task.ai?.experiencePreparation} />
     <div className="execution-card__primary execution-card__actions">
-      <span className={`execution-status status-${column === 'completed' ? 'accepted' : task.state === 'awaiting_acceptance' ? task.state : task.ai ? runtimeState(task.ai.state) : task.state}`}>{status}</span>
+      <span className={`execution-status status-${column === 'completed' ? 'accepted' : task.state === 'awaiting_acceptance' ? task.state : task.ai ? runtimeState(task.ai.state) : task.state}`}>{attention && <CircleAlert size={14} aria-hidden="true" />}{status}</span>
       <div className="execution-card__buttons">
+        {task.sessionId && onExperience && <ExperienceCaptureButton session={task.ai} busy={busy} onClick={() => onExperience(task.sessionId!)} />}
         {next?.action === 'complete' && task.sessionId && onOpenCodex && <button type="button" disabled={busy} onClick={() => onOpenCodex(task)}><ExternalLink size={12} />{t("session.open")}</button>}
         {next?.action === 'start' && onCompleteTask && <button type="button" disabled={busy} onClick={() => onCompleteTask(task)}><Check size={12} />{t("session.confirm")}</button>}
+        {task.ai && ['waiting_user', 'waiting_confirmation', 'unknown'].includes(column) && onArchive && <button type="button" disabled={busy} onClick={() => onArchive(task.ai!)}>{t('batch.archive')}</button>}
         {next && <button type="button" className={next.action === 'complete' ? undefined : 'is-next-action'} disabled={busy} onClick={() => next.action === 'start' && onOpenCodex ? onOpenCodex(task) : next.action === 'complete' && onCompleteTask ? onCompleteTask(task) : next.action === 'review' && onReviewTask ? onReviewTask(task) : next.action === 'session' && onOpenSession ? onOpenSession(task.sessionId!) : onOpenTask(task.id)}>{next.action === 'start' ? <Play size={12} /> : next.action === 'review' ? <ListTodo size={12} /> : next.action === 'session' ? <ExternalLink size={12} /> : <Check size={12} />}{t(next.label)}</button>}
       </div>
     </div>
@@ -68,19 +77,24 @@ export function ExecutionCard({ task, projects, busy, onOpenTask, onOpenSession,
   </article>;
 }
 
-interface SessionCardProps extends Pick<TaskCallbacks, 'onOpenSession' | 'onConfirmSession'> { session: LiveSession; tasks: Task[]; projects: Project[]; busy: boolean; onDragStart?: (event: DragEvent, session: LiveSession) => void; onDragEnd?: () => void }
-function SessionCard({ session, tasks, projects, busy, onOpenSession, onConfirmSession, onDragStart, onDragEnd }: SessionCardProps) {
+interface SessionCardProps extends Pick<TaskCallbacks, 'onOpenSession' | 'onConfirmSession'> { session: LiveSession; tasks: Task[]; projects: Project[]; busy: boolean; onExperience?: (id: string) => void; onSummary?: (id: string) => void; onArchive?: (session: LiveSession) => void; onDragStart?: (event: DragEvent, session: LiveSession) => void; onDragEnd?: () => void }
+// 展示独立会话的观察状态和人工操作。
+function SessionCard({ session, tasks, projects, busy, onOpenSession, onConfirmSession, onExperience, onSummary, onArchive, onDragStart, onDragEnd }: SessionCardProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const workspace = projects.find(project => project.codex?.workspacePath === session.cwd)?.title || session.cwd?.split(/[\\/]/).pop();
   const title = session.title || `Codex · ${workspace || session.id.slice(-8)}`;
+  // 根据最新观察判断是否允许确认，经验审核保持独立。
   const canConfirm = canConfirmAiSession(session, tasks);
   const completed = sessionColumn(session) === 'completed';
-  return <article className="execution-card execution-session-card" draggable={!busy && canConfirm && !!onDragStart} title={canConfirm ? t("session.dragConfirm") : undefined} onDragStart={event => onDragStart?.(event, session)} onDragEnd={onDragEnd}>
+  const attention = !completed ? runtimeAttention(session) : undefined;
+  return <article className={`execution-card execution-session-card ${attention ? `needs-${attention}` : ''}`} draggable={!busy && canConfirm && !!onDragStart} title={canConfirm ? t("session.dragConfirm") : undefined} onDragStart={event => onDragStart?.(event, session)} onDragEnd={onDragEnd}>
     <button type="button" className="execution-card__summary" aria-expanded={expanded} aria-controls={`execution-session-${session.id}`} onClick={() => setExpanded(value => !value)}><strong title={title}>{title}</strong><ChevronDown size={14} /></button>
-    {session.preview && <p className="execution-card__preview">{session.preview}</p>}
-    <small className="execution-card__activity">{t("card.lastActivity", { at: fmt(lastActivity(session, session.observedAt)) })}</small>
-    <div className="execution-card__primary execution-card__actions"><span className={`execution-status status-${completed ? 'accepted' : runtimeState(session.state)}`}>{isHistoricalSession(session) ? t("session.historicalCompleted") : completed ? t("board.completed") : sessionColumn(session) === 'waiting_confirmation' ? t("activity.pending") : runtimeLabel(session)}</span><div className="execution-card__buttons"><button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={12} />{t("session.open")}</button>{canConfirm && onConfirmSession && <button type="button" disabled={busy} onClick={() => onConfirmSession(session)}><Check size={12} />{t("session.confirm")}</button>}</div></div>
+    <SessionSummary session={session} onGenerate={onSummary} />
+    <small className="execution-card__activity">{t("batch.created")} {session.catalogCreatedAt ? fmt(session.catalogCreatedAt) : t("batch.unknownCreated")} · {t("card.lastActivity", { at: fmt(sessionLastActivity(session)) })}</small>
+    {session.stateConfidence === 'last_observed' && <small className="execution-card__activity">{t('workspace.lastObservedAt', { at: fmt(session.observedAt) })}</small>}
+    <ExperienceProgress value={session.experience} preparation={session.experiencePreparation} />
+    <div className="execution-card__primary execution-card__actions"><span className={`execution-status status-${completed ? 'accepted' : runtimeState(session.state)}`}>{attention && <CircleAlert size={14} aria-hidden="true" />}{isHistoricalSession(session) ? t("session.historicalCompleted") : completed ? t("board.completed") : sessionColumn(session) === 'waiting_confirmation' ? t("activity.pending") : runtimeLabel(session)}</span><div className="execution-card__buttons"><button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={12} />{t("session.open")}</button>{onExperience && <ExperienceCaptureButton session={session} busy={busy} onClick={() => onExperience(session.id)} />}{canConfirm && onConfirmSession && <button type="button" disabled={busy} onClick={() => onArchive ? onArchive(session) : onConfirmSession(session)}><Check size={12} />{t("session.confirm")}</button>}{!canConfirm && !completed && ["waiting_user", "unknown"].includes(sessionColumn(session)) && onArchive && <button type="button" disabled={busy} onClick={() => onArchive(session)}><Check size={12} />{t("batch.archive")}</button>}</div></div>
     <div id={`execution-session-${session.id}`} className="execution-card__content" hidden={!expanded}><div className="execution-card__body">
       <div className="execution-card__topline"><span className="execution-session-card__source" title={session.cwd}><Code2 size={11} aria-hidden="true" /><span>Codex{workspace ? ` · ${workspace}` : ''}</span></span><span>{fmt(session.catalogUpdatedAt || session.observedAt)}</span></div>
       {(session.confirmationHistory ?? (session.confirmedAt ? [{ at: session.confirmedAt }] : [])).map((entry, index) => <small key={`${entry.at}-${index}`}>{t("session.confirmedAt", { at: fmt(entry.at) })}</small>)}
@@ -88,44 +102,25 @@ function SessionCard({ session, tasks, projects, busy, onOpenSession, onConfirmS
   </article>;
 }
 
-export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, busy, onOpenTask, onOpenSession, onConfirmSession, onReviewTask, onOpenCodex, onCompleteTask, onTransition, onError }: Omit<TaskCallbacks, 'onReschedule'> & { tasks: Task[]; allTasks?: Task[]; sessions?: LiveSession[]; projects: Project[]; busy: boolean; onError: (message: string) => void }) {
+/** 按任务状态和会话观察组织看板，保留人工确认与拖动语义。 */
+export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, busy, onOpenTask, onOpenSession, onConfirmSession, onReviewTask, onOpenCodex, onCompleteTask, onTransition, onError, onExperience, onSummary, grouped, onBatchProject, onArchive }: Omit<TaskCallbacks, 'onReschedule'> & { tasks: Task[]; allTasks?: Task[]; sessions?: LiveSession[]; projects: Project[]; busy: boolean; onError: (message: string) => void; onExperience: (id: string) => void; onSummary: (id: string) => void; grouped: boolean; onBatchProject: (id: string) => void; onArchive: (session: LiveSession) => void }) {
   const { t } = useTranslation();
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [showCompletedHistory, setShowCompletedHistory] = useState(false);
   const [sessionLimits, setSessionLimits] = useState<Record<string, number>>({});
-  const batchRunning = useRef(false);
-  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const confirming = useRef(new Set<string>());
   const [confirmingSessions, setConfirmingSessions] = useState<string[]>([]);
   const confirmSession: TaskCallbacks['onConfirmSession'] = async session => {
-    if (busy || batchRunning.current || confirming.current.has(session.id)) return false;
+    if (busy || confirming.current.has(session.id)) return false;
     confirming.current.add(session.id); setConfirmingSessions([...confirming.current]);
     try { return await onConfirmSession(session); }
     finally { confirming.current.delete(session.id); setConfirmingSessions([...confirming.current]); }
   };
-  const confirmableSessions = sessions.filter(session => canConfirmAiSession(session, allTasks));
-  const confirmAllSessions = async () => {
-    if (busy || batchRunning.current || confirming.current.size || !confirmableSessions.length) return;
-    batchRunning.current = true;
-    const pending = [...confirmableSessions];
-    let succeeded = 0;
-    setBatchProgress({ done: 0, total: pending.length });
-    try {
-      for (const [index, session] of pending.entries()) {
-        try { if (await onConfirmSession(session, true)) succeeded++; }
-        catch { /* Keep processing the remaining sessions after an individual failure. */ }
-        setBatchProgress({ done: index + 1, total: pending.length });
-      }
-      onError(t("session.confirmAllResult", { succeeded, failed: pending.length - succeeded }));
-    } finally {
-      batchRunning.current = false;
-      setBatchProgress(null);
-    }
-  };
   const endDrag = () => setDropTarget(null);
-  const renderTask = (task: Task) => <ExecutionCard key={task.id} task={task} projects={projects} busy={busy} onOpenTask={onOpenTask} onOpenSession={onOpenSession} onReviewTask={onReviewTask} onOpenCodex={onOpenCodex} onCompleteTask={onCompleteTask}
+  // 构造任务和会话卡片，同时保留各自的拖动数据。
+  const renderTask = (task: Task) => <ExecutionCard key={task.id} task={task} projects={projects} busy={busy} onOpenTask={onOpenTask} onOpenSession={onOpenSession} onReviewTask={onReviewTask} onOpenCodex={onOpenCodex} onCompleteTask={onCompleteTask} onExperience={onExperience} onSummary={onSummary} onArchive={onArchive}
     onDragStart={(event, value) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/ai-todos', JSON.stringify({ id: value.id, revision: value.revision })); }} onDragEnd={endDrag} />;
-  const renderSession = (session: LiveSession) => <SessionCard key={session.id} session={session} tasks={allTasks} projects={projects} busy={busy || !!batchProgress || confirmingSessions.includes(session.id)} onOpenSession={onOpenSession} onConfirmSession={confirmSession}
+  const renderSession = (session: LiveSession) => <SessionCard key={session.id} session={session} tasks={allTasks} projects={projects} busy={busy || confirmingSessions.includes(session.id)} onOpenSession={onOpenSession} onConfirmSession={confirmSession} onExperience={onExperience} onSummary={onSummary} onArchive={onArchive}
     onDragStart={(event, value) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/ai-todos-session', JSON.stringify({ id: value.id, observedAt: value.observedAt, event: value.event, turnId: value.turnId, catalogUpdatedAt: value.catalogUpdatedAt })); }} onDragEnd={endDrag} />;
   const completedItems = [
     ...tasks.filter(task => executionColumnForTask(task) === 'completed').map(task => ({ kind: 'task' as const, value: task, at: task.review?.at || task.updatedAt })),
@@ -135,6 +130,7 @@ export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, bu
     {boardColumns.map(column => {
       const items = tasks.filter(task => column.stages.includes(executionColumnForTask(task)));
       const sessionItems = sessions.filter(session => column.stages.includes(sessionColumn(session)));
+      if (column.id === 'waiting_confirmation') sessionItems.sort((a, b) => userActionPriority(a.state) - userActionPriority(b.state));
       const completed = column.id === 'completed';
       if (completed) items.sort((left, right) => (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0));
       return <section className={`execution-column column-${column.id} ${dropTarget === column.id ? 'is-drop-target' : ''}`} key={column.id} aria-labelledby={`execution-column-${column.id}`}
@@ -153,7 +149,7 @@ export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, bu
             if (!event.dataTransfer.types.includes('application/ai-todos')) return;
             const value = JSON.parse(event.dataTransfer.getData('application/ai-todos'));
             const task = tasks.find(item => item.id === value.id);
-            if (!task) return;
+            if (!task || column.stages.includes(executionColumnForTask(task))) return;
             const decision = boardDropDecision(task, column.dropTarget);
             if (decision.reason) throw new Error(decision.reason);
             if (decision.action === 'request_changes') {
@@ -163,13 +159,13 @@ export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, bu
           } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
         }}>
         <header><span><i aria-hidden="true" /><strong id={`execution-column-${column.id}`}>{t(column.label)}</strong></span><em>{t("board.taskCount", { count: items.length })}{sessionItems.length > 0 && <> · {t("board.sessionCount", { count: sessionItems.length })}</>}</em>
-        {column.id === 'waiting_confirmation' && (confirmableSessions.length > 0 || batchProgress) && <button type="button" className="execution-column__bulk" disabled={busy || !!batchProgress || confirmingSessions.length > 0} title={batchProgress ? t("session.confirmAllProgress", batchProgress) : `${t("session.confirmAll")}：${t("session.confirmAllHint")}`} aria-label={batchProgress ? t("session.confirmAllProgress", batchProgress) : t("session.confirmAll")} aria-live="polite" onClick={confirmAllSessions}>{batchProgress ? <LoaderCircle size={14} aria-hidden="true" /> : <CheckCheck size={14} aria-hidden="true" />}</button>}</header>
+</header>
         <div className="execution-column__tasks" tabIndex={0} aria-label={t("board.cards", { label: t(column.label) })}>
-          {completed ? completedItems.slice(0, showCompletedHistory ? undefined : 5).map(item => item.kind === 'task' ? renderTask(item.value) : renderSession(item.value)) : <>{items.map(renderTask)}{sessionItems.slice(0, sessionLimits[column.id] || 50).map(renderSession)}</>}
-          {!completed && sessionItems.length > (sessionLimits[column.id] || 50) && <button type="button" className="execution-column__history" onClick={() => setSessionLimits(current => ({ ...current, [column.id]: (current[column.id] || 50) + 50 }))}>{t("board.moreSessions", { count: sessionItems.length - (sessionLimits[column.id] || 50) })}</button>}
+          {grouped ? <SessionProjectGroups projects={projects} pending={column.id === 'waiting_confirmation'} onBatchProject={onBatchProject} items={[...items.map(task => ({ key: `task-${task.id}`, task, session: task.ai, content: renderTask(task) })), ...sessionItems.map(session => ({ key: `session-${session.id}`, session, content: renderSession(session) }))]} /> : completed ? completedItems.slice(0, showCompletedHistory ? undefined : 5).map(item => item.kind === 'task' ? renderTask(item.value) : renderSession(item.value)) : <>{items.map(renderTask)}{sessionItems.slice(0, sessionLimits[column.id] || 50).map(renderSession)}</>}
+          {!grouped && !completed && sessionItems.length > (sessionLimits[column.id] || 50) && <button type="button" className="execution-column__history" onClick={() => setSessionLimits(current => ({ ...current, [column.id]: (current[column.id] || 50) + 50 }))}>{t("board.moreSessions", { count: sessionItems.length - (sessionLimits[column.id] || 50) })}</button>}
           {!items.length && !sessionItems.length && <div className="execution-column__empty">{t("board.empty")}</div>}
         </div>
-        {completed && completedItems.length > 5 && <button type="button" className="execution-column__history" aria-expanded={showCompletedHistory} onClick={() => setShowCompletedHistory(value => !value)}>{showCompletedHistory ? t("board.collapseHistory") : t("board.historyCount", { count: completedItems.length })}</button>}
+        {!grouped && completed && completedItems.length > 5 && <button type="button" className="execution-column__history" aria-expanded={showCompletedHistory} onClick={() => setShowCompletedHistory(value => !value)}>{showCompletedHistory ? t("board.collapseHistory") : t("board.historyCount", { count: completedItems.length })}</button>}
       </section>;
     })}
   </div>

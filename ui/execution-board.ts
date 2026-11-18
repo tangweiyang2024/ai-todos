@@ -5,16 +5,23 @@ import type { TranslationKey } from '../src/i18n.ts';
 import type { Task, LiveSession } from '../src/types.ts';
 import { runtimeState } from '../src/runtime.ts';
 import { labels, runtimeLabel } from './format.ts';
+export function runtimeAttention(runtime?: { state?: string; observedState?: string; stateConfidence?: string } | null): 'action' | 'problem' | 'uncertain' | undefined {
+  if (!runtime) return;
+  const state = runtimeState(runtime.state);
+  if (['waiting_input', 'waiting_approval'].includes(state)) return 'action';
+  if (['failed', 'interrupted'].includes(state)) return 'problem';
+  if ((state === 'running' && runtime.stateConfidence === 'last_observed') || (state === 'unknown' && ['queued', 'running'].includes(runtimeState(runtime.observedState)))) return 'uncertain';
+}
 
 export const boardColumns: { id: string; label: TranslationKey; stages: string[]; dropTarget: string }[] = [
-  { id: 'unstarted', label: 'board.unstarted', stages: ['defining', 'ready', 'changes_requested'], dropTarget: 'ready' },
-  { id: 'executing', label: 'board.executing', stages: ['executing'], dropTarget: 'executing' },
+  { id: 'executing', label: 'board.executing', stages: ['defining', 'ready', 'changes_requested', 'executing'], dropTarget: 'executing' },
   { id: 'waiting_confirmation', label: 'board.pending', stages: ['waiting_user', 'waiting_confirmation', 'unknown'], dropTarget: 'waiting_confirmation' },
   { id: 'completed', label: 'board.completed', stages: ['completed'], dropTarget: 'completed' },
 ];
 export function executionColumnForTask(task: Pick<Task, 'state' | 'ai'>, runtime = task.ai) {
   if (task.state === 'cancelled') return 'cancelled';
   if (task.state === 'accepted') return 'completed';
+  if (runtime?.archiveConfirmed && runtime.confirmedAt) return 'completed';
   if (task.state === 'awaiting_acceptance') return 'waiting_user';
   if (runtime) {
     const state = runtimeState(runtime.state);
@@ -65,8 +72,9 @@ export function isHistoricalSession(session: Pick<LiveSession, 'state'> & Partia
     && session.source === 'codex-app-server' && session.event === 'thread/list' && session.catalogVisible === true
     && Number.isFinite(updated) && now - updated >= 24 * 60 * 60 * 1000;
 }
-export function executionColumnForSession(session: Pick<LiveSession, 'state' | 'confirmedAt'> & Partial<Pick<LiveSession, 'observedState' | 'source' | 'event' | 'catalogVisible' | 'catalogUpdatedAt'>>, now = Date.now()) {
+export function executionColumnForSession(session: Pick<LiveSession, 'state' | 'confirmedAt'> & Partial<Pick<LiveSession, 'observedState' | 'source' | 'event' | 'catalogVisible' | 'catalogUpdatedAt' | 'archiveConfirmed'>>, now = Date.now()) {
   const state = runtimeState(session.state);
+  if (session.archiveConfirmed && session.confirmedAt) return 'completed';
   if (state === 'running' || state === 'queued') return 'executing';
   if (isHistoricalSession(session, now)) return 'completed';
   if (session.confirmedAt && ['idle', 'completed'].includes(state)) return 'completed';

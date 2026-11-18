@@ -52,10 +52,14 @@ test('human session confirmation checks the displayed version and binding, and c
   assert.equal(commandSchema.safeParse({ action: 'confirm_session', ...input() }).success, false);
   for (const state of ['waiting', 'waiting_input', 'queued']) {
     const oldId = randomUUID();
-    s.db.prepare('INSERT INTO sessions VALUES (?,?)').run(oldId, JSON.stringify({ id: oldId, observedState: state, observedAt: s.at() }));
+    s.db.prepare('INSERT INTO sessions VALUES (?,?)').run(oldId, JSON.stringify({ id: oldId, observedState: state, observedAt: s.at(), source: 'codex-hook' }));
   }
   now += 300001;
-  assert.ok(s.sessions().filter(session => session.id !== id).every(session => session.state === 'unknown'));
+  const old = s.sessions().filter(session => session.id !== id);
+  assert.equal(old.find(session => session.observedState === 'queued').state, 'unknown');
+  assert.equal(old.find(session => session.observedState === 'waiting').state, 'waiting_approval');
+  assert.equal(old.find(session => session.observedState === 'waiting_input').state, 'waiting_input');
+  assert.ok(old.filter(session => session.state !== 'unknown').every(session => session.stateConfidence === 'last_observed'));
 });
 
 test('a new turn reopens an accepted linked task and requires fresh human confirmation', t => {
@@ -138,4 +142,40 @@ test('session activity records meaningful status changes and human confirmations
   observe('UserPromptSubmit', 'two');
   x = s.sessions().find(x => x.id === id);
   assert.deepEqual(x.activityHistory.map(e => e.state), ['running', 'waiting_approval', 'running', 'idle', 'confirmed', 'running']);
+});
+
+test('explicit archive confirms running and interrupted sessions without accepting their linked task and new activity reopens them', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'ai-todos-archive-'));
+  let now = Date.parse('2026-11-17T10:00:00Z');
+  const s = new Store(join(dir, 'data.sqlite'), () => now);
+  t.after(() => { s.close(); rmSync(dir, { recursive: true, force: true }); });
+  const id = randomUUID();
+  const observe = event => { now++; return s.observe({ session_id: id, cwd: '/tmp/project', hook_event_name: event, turn_id: 'turn-1' }); };
+  const input = () => { const x = s.sessions().find(x => x.id === id); return { id, observedAt: x.observedAt, event: x.event, turnId: x.turnId ?? null, catalogUpdatedAt: x.catalogUpdatedAt ?? null, confirmed: true, archive: true }; };
+  observe('UserPromptSubmit');
+  let task = s.command({ action: 'create', kind: 'task', requestId: randomUUID(), data: { title: '关联任务' } });
+  task = s.command({ action: 'bind', id: task.id, revision: task.revision, sessionId: id });
+  const stale = input(); observe('PreToolUse');
+  assert.throws(() => s.confirmSession(stale), /会话已变化/);
+  const archived = s.confirmSession(input());
+  assert.ok(archived.confirmedAt);
+  assert.equal(s.get('task', task.id).state, task.state);
+  observe('PostToolUse'); assert.equal(s.sessions().find(x => x.id === id).confirmedAt, undefined);
+  observe('Interrupt'); assert.ok(s.confirmSession(input()).confirmedAt);
+  assert.equal(s.get('task', task.id).state, task.state);
+});
+
+test('archived running session survives unchanged catalog sync and reopens after new catalog activity', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'ai-todos-archive-sync-'));
+  let now = Date.parse('2026-11-17T10:00:00Z');
+  const s = new Store(join(dir, 'data.sqlite'), () => now);
+  t.after(() => { s.close(); rmSync(dir, { recursive: true, force: true }); });
+  const id = randomUUID(), thread = { id, title: '会话', cwd: '/tmp', updatedAt: new Date(now).toISOString(), createdAt: '2026-11-01T00:00:00.000Z', state: 'running' };
+  s.syncCodexThreads([thread]); const x = s.sessions().find(x => x.id === id);
+  assert.equal(x.catalogCreatedAt, thread.createdAt);
+  s.confirmSession({ id, observedAt: x.observedAt, event: x.event, turnId: x.turnId ?? null, catalogUpdatedAt: x.catalogUpdatedAt, confirmed: true, archive: true });
+  now++; s.syncCodexThreads([thread]);
+  assert.ok(s.sessions().find(x => x.id === id).confirmedAt);
+  now++; s.syncCodexThreads([{ ...thread, updatedAt: new Date(now).toISOString() }]);
+  assert.equal(s.sessions().find(x => x.id === id).confirmedAt, undefined);
 });

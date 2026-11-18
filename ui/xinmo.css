@@ -385,7 +385,6 @@
 .execution-column > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2); padding: 9px var(--sp-3); border-bottom: 1px solid var(--line); background: color-mix(in oklch, var(--surface) 72%, transparent); }
 .execution-column > header > span { display: flex; align-items: center; min-width: 0; gap: 7px; }
 .execution-column > header i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
-.execution-column.column-unstarted > header i { background: var(--blue); }
 .execution-column.column-executing > header i { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .execution-column.column-waiting_user > header i, .execution-column.column-waiting_confirmation > header i { background: var(--warning); }
 .execution-column.column-completed > header i { background: var(--accent); }

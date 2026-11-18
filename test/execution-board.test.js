@@ -3,9 +3,19 @@ import assert from 'node:assert/strict';
 import { runtimeState, runtimeLabels, runtimeLabel, codexRuntimeState } from '../src/runtime.ts';
 import { boardColumns, executionColumnForTask, executionColumnForSession, taskStatus, taskNextStep, canConfirmAiSession, visibleExecutionSessions, boardDropDecision } from '../ui/execution-board.ts';
 import { taskSessionPrompt } from '../ui/codex-prompts.ts';
+import * as board from '../ui/execution-board.ts';
 
 const task = (state, ai) => ({ id: 'task', state, sessionId: ai?.id, ai });
 const runtime = state => ({ id: 'session', state, observedAt: '2026-10-10T00:00:00Z' });
+
+test('attention styling distinguishes user action and failures from normal completion', () => {
+  for (const state of ['waiting_approval', 'waiting_input']) assert.equal(board.runtimeAttention(runtime(state)), 'action');
+  for (const state of ['failed', 'interrupted']) assert.equal(board.runtimeAttention(runtime(state)), 'problem');
+  assert.equal(board.runtimeAttention({ ...runtime('running'), stateConfidence: 'last_observed' }), 'uncertain');
+  assert.equal(board.runtimeAttention({ ...runtime('unknown'), observedState: 'running' }), 'uncertain');
+  for (const state of ['running', 'idle', 'completed', 'unknown']) assert.equal(board.runtimeAttention(runtime(state)), undefined);
+  assert.equal(board.runtimeAttention(null), undefined);
+});
 
 test('bound planning sessions remain represented by their original task', () => {
   const prompt = taskSessionPrompt({ title: '原任务', description: '要做的内容', criteria: '验收要求' });
@@ -24,7 +34,7 @@ test('bound planning sessions remain represented by their original task', () => 
 test('all Xinmo runtime states and planning labels retain their board meaning', () => {
   const expected = {
     queued: ['等待执行', 'executing'], running: ['正在执行', 'executing'],
-    waiting_approval: ['等待审批', 'waiting_user'], waiting_input: ['等待输入', 'waiting_user'],
+    waiting_approval: ['等待用户授权', 'waiting_user'], waiting_input: ['等待用户输入', 'waiting_user'],
     interrupted: ['已中断', 'waiting_user'], failed: ['执行失败', 'waiting_user'],
     completed: ['待确定', 'waiting_confirmation'], idle: ['待确定', 'waiting_confirmation'], unknown: ['状态未确认', 'unknown'],
   };
@@ -120,8 +130,10 @@ test('confirmation, represented sessions and post-acceptance activity match Xinm
   assert.match(boardDropDecision(owner, 'completed').reason, /不能通过拖拽/);
 });
 
-test('board has four workflow columns and keeps unknown sessions in pending without completing them', () => {
-  assert.deepEqual(boardColumns.map(c => c.id), ['unstarted', 'executing', 'waiting_confirmation', 'completed']);
+test('board keeps existing unstarted tasks in progress and unknown sessions in pending', () => {
+  assert.deepEqual(boardColumns.map(c => c.id), ['executing', 'waiting_confirmation', 'completed']);
+  const running = boardColumns.find(c => c.id === 'executing');
+  for (const state of ['defining', 'ready', 'changes_requested']) assert.ok(running.stages.includes(executionColumnForTask(task(state))), state);
   const pending = boardColumns.find(c => c.id === 'waiting_confirmation');
   for (const state of ['waiting_input', 'waiting_approval', 'failed', 'interrupted', 'idle', 'completed', 'unknown']) {
     const session = runtime(state);
@@ -148,4 +160,19 @@ test('older rollout activity stays in progress while clearly marked as last obse
   assert.equal(runtimeLabel(session), '上次观察：执行中');
   assert.equal(taskStatus(task('executing', session)), '上次观察：执行中');
   assert.equal(canConfirmAiSession(session, []), false);
+});
+
+test('stale pending authorization and input are labeled as last observed, not live certainty', () => {
+  assert.equal(runtimeLabel({ state: 'waiting_approval', stateConfidence: 'last_observed' }), '上次观察：等待用户授权');
+  assert.equal(runtimeLabel({ state: 'waiting_input', stateConfidence: 'last_observed' }), '上次观察：等待用户输入');
+  assert.equal(canConfirmAiSession(runtime('waiting_approval'), []), false);
+  assert.equal(canConfirmAiSession(runtime('waiting_input'), []), false);
+});
+
+test('explicitly archived running or interrupted sessions move to completed without accepting their task', () => {
+  for (const state of ['running', 'interrupted', 'waiting_input']) {
+    const session = { ...runtime(state), confirmedAt: '2026-11-17T10:00:00Z', archiveConfirmed: true };
+    assert.equal(executionColumnForSession(session), 'completed');
+    assert.equal(executionColumnForTask(task('executing', session)), 'completed');
+  }
 });

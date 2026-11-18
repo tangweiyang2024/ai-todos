@@ -14,13 +14,18 @@ import { DatePickerField, SelectField } from './components/FormControls.tsx';
 import { BoardView, ExecutionCard } from './components/ExecutionView.tsx';
 import { SessionHistory } from './components/SessionHistory.tsx';
 import { SessionList } from './components/SessionList.tsx';
+import { sessionWithinDays, sessionOverlapsRange, sessionProject, eligibleProjectPending, matchesSessionSearch } from './session-list.ts';
+import { SessionBatchDialog } from './components/SessionBatchDialog.tsx';
+import { ExperienceReadyNotice } from './components/ExperienceReadyNotice.tsx';
+import { WikiExperience } from './components/WikiExperience.tsx';
+import { parseWikiLink } from './wiki-link.ts';
 import { ProjectPicker } from './components/ProjectPicker.tsx';
 import { TaskEditor, EditorDialog, Field, ScheduleFields, Delivery } from './components/TaskEditor.tsx';
 import { TodayView, DailyPlanEditor, dayPlans } from './components/TodayView.tsx';
 import { InboxView } from './components/InboxView.tsx';
 import { clock, dateInput, fmt, hours, labels, localDay, parseSchedule, number } from './format.ts';
 import { executionPrompt } from './codex-prompts.ts';
-import { visibleExecutionSessions, executionColumnForSession } from './execution-board.ts';
+import { visibleExecutionSessions, executionColumnForSession, executionColumnForTask } from './execution-board.ts';
 import './xinmo.css';
 import './style.css';
 import './refinement.css';
@@ -29,6 +34,7 @@ import './workspace.css';
 const localOrigin = '__AI_TODOS_ORIGIN__';
 const embedded = window.parent !== window;
 const bridge = embedded ? new App({ name: 'ai-todos', version: '0.1.10' }, { availableDisplayModes: ['inline', 'fullscreen'] }, { autoResize: false }) : null;
+const wikiUiSessionId = embedded ? crypto.randomUUID() : null;
 const mainPages = { work: 'nav.work', projects: 'nav.projects' } as const;
 const pages: Record<string, TranslationKey> = { ...mainPages, today: 'nav.today', inbox: 'nav.inbox', plans: 'nav.plans', settings: 'nav.settings' };
 const singular: Record<string, TranslationKey> = { task: 'entity.task', project: 'entity.project', objective: 'entity.objective', keyResult: 'entity.keyResult', plan: 'entity.plan' };
@@ -39,12 +45,22 @@ function api(path: 'task', data: { id: string }): Promise<{ task: Task; history:
 function api(path: 'review-ticket', data: { id: string; revision: number }): Promise<{ ticket: string; task: Task }>;
 function api(path: 'codex', data: { operation: 'prepare_task_session'; id: string; revision: number; locale?: Locale }): Promise<{ sessionId: string; prefillTask: boolean }>;
 function api(path: 'codex', data: { operation: 'sync_projects' | 'sync_threads' }): Promise<SyncResult>;
+function api(path: 'codex', data: { operation: 'summarize_session'; id: string }): Promise<{ queued: boolean }>;
 function api(path: 'codex', data: { operation: 'refine'; draft: TaskDraft; field?: DefinitionField }): Promise<DefinitionSuggestion>;
 function api(path: 'codex', data: { operation: 'capture_refine'; draft: TaskDraft }): Promise<CaptureSuggestion>;
-function api(path: 'session-confirm', data: Omit<Parameters<TaskCallbacks['onConfirmSession']>[0], 'catalogUpdatedAt'> & { catalogUpdatedAt: string | null; confirmed: true }): Promise<Session>;
+function api(path: 'session-confirm', data: Omit<Parameters<TaskCallbacks['onConfirmSession']>[0], 'catalogUpdatedAt'> & { catalogUpdatedAt: string | null; confirmed: true; archive?: true }): Promise<Session>;
 function api(path: string, data: unknown): Promise<unknown>;
 async function api(path: string, data?: unknown): Promise<unknown> {
   if (embedded) {
+    // 旧 MCP 连接拒绝顶层 archive 参数；显式归档通过现有稳定 UI 信封访问本地校验。
+    if (path === 'session-confirm' && (data as { archive?: boolean } | undefined)?.archive) return api('wiki/archive_session', { confirmation: data });
+    // 知识审核只通过应用可见的工具访问，预览票据绑定当前界面实例。
+    if (path.startsWith('wiki/')) {
+      const action = { ...(data as Record<string, unknown>), operation: path.slice('wiki/'.length) };
+      const result = await bridge!.callServerTool({ name: 'ai_todos_wiki', arguments: { uiSessionId: wikiUiSessionId, action } }, { timeout: 330000 });
+      if (result.isError) throw new Error(localizedError(result.structuredContent ?? { error: result.content?.find(item => item.type === 'text')?.text }));
+      return result.structuredContent ?? JSON.parse(result.content.find(item => item.type === 'text')!.text);
+    }
     const names: Record<string, string> = { state: 'ai_todos_workspace', command: 'ai_todos_manage', task: 'ai_todos_task', codex: 'ai_todos_codex', 'session-confirm': 'ai_todos_confirm_session', 'task-complete': 'ai_todos_complete_task' };
     if (!names[path]) throw new Error(i18n.t("connection.localReview"));
     const result = await bridge!.callServerTool({ name: names[path], arguments: (path === 'command' ? { command: data } : path === 'codex' ? { action: data } : (data ?? {})) as Record<string, unknown> });
@@ -132,13 +148,20 @@ function dailyTotals(snapshot: Snapshot) {
 }
 
 function Workspace() {
+  // 初始化工作台状态，并保留真实读取到的快照和审核上下文。
   const { t } = useTranslation();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [connectionError, setConnectionError] = useState('');
   const [hostContext, setHostContext] = useState<ReturnType<App['getHostContext']>>();
   const [threadTransport, setThreadTransport] = useState<string | null>(null);
-  const [view, setView] = useState({ page: 'work', mode: 'list', project: '', search: '' });
+  const [view, setView] = useState({ page: 'work', mode: 'board', project: '', search: '' });
+  const [groupProjects, setGroupProjects] = useState(false);
+  const [batchSessions, setBatchSessions] = useState<Snapshot['sessions'] | null>(null);
+  const [ranges, setRanges] = useState({ pending: { mode: '2', from: '', to: '' }, completed: { mode: '2', from: '', to: '' } });
   const [modal, setModal] = useState<Modal | null>(null);
+  const [experienceSession, setExperienceSession] = useState<string | null>(null);
+  const [experienceRecord, setExperienceRecord] = useState<string | undefined>();
+  const [experienceRevision, setExperienceRevision] = useState<number | undefined>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -150,6 +173,7 @@ function Workspace() {
   modalRef.current = modal;
   const scheduling = useRef(new Set<string>());
   const toast = (value: string) => { if (!mounted.current) return; setMessage(value); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setMessage(''), 6000); };
+  // 合并并发刷新，避免较旧快照覆盖用户刚保存的任务。
   const refresh = async (force = false) => {
     if (refreshing.current) {
       const previous = refreshing.current;
@@ -224,20 +248,57 @@ function Workspace() {
     try { const result = await pending; if (mounted.current) { setThreadTransport(result.transport ?? null); lastThreadSync.current = Date.now(); await refresh(true); } return result; }
     finally { if (syncingThreads.current === pending) syncingThreads.current = null; }
   };
+  const summarizeSession = (id: string) => { void run(async () => { await api('codex', { operation: 'summarize_session', id }); }, t('session.summaryQueued')); };
   const syncWorkspace = () => run(async () => {
     const result = await syncThreads(); toast(t("session.synced", { count: result.count, value: result.transport === 'history' ? t("connection.historyOnly") : '' }));
   });
   const openSession = (id: string) => run(() => openCodexSession(id));
-  const confirmSession: TaskCallbacks['onConfirmSession'] = async (session, silent = false) => {
+  // 卡片只负责交接到普通 Codex 沉淀聊天，审核和 ingest 在该会话内完成。
+  const openExperience = (id: string) => run(async () => {
+    // 读取当前来源的持久化准备状态，避免重复启动或打开未完成的聊天。
+    const session = snapshotRef.current?.sessions.find(session => session.id === id);
+    const preparation = session?.experiencePreparation;
+    if (preparation?.status === 'preparing') return;
+    // 首次点击只接受后台准备，面板无需等待原文读取和会话创建。
+    if (!session?.experience || preparation?.status === 'failed') {
+      await api('wiki/prepare_capture', { sessionId: id });
+      await refresh(true);
+      toast(t('wiki.captureQueued'));
+      return;
+    }
+
+    // 就绪后由用户主动进入；打开失败时不消除未读提醒。
+    const result = await api('wiki/open_capture', { sessionId: id }) as { prefilled: boolean };
+    if (preparation?.unread) await api('wiki/ack_capture', { sessionId: id, jobId: preparation.id });
+    await refresh(true);
+    toast(t(result.prefilled ? 'wiki.captureOpened' : 'wiki.captureContinued'));
+  });
+  const deferCaptureNotice = (id: string, jobId: string) => run(async () => {
+    await api('wiki/ack_capture', { sessionId: id, jobId });
+    await refresh(true);
+  });
+  const confirmSession: TaskCallbacks['onConfirmSession'] = async (session, silent = false, archive = false) => {
+    // 只提交用户当前看到的观察版本，不替换为轮询取得的新版本。
     try {
-      const confirmed = await api('session-confirm', { id: session.id, observedAt: session.observedAt, event: session.event, turnId: session.turnId ?? null, catalogUpdatedAt: session.catalogUpdatedAt ?? null, confirmed: true });
-      // Let an earlier snapshot finish so it cannot overwrite this confirmation.
+      const confirmed = await api('session-confirm', { id: session.id, observedAt: session.observedAt, event: session.event, turnId: session.turnId ?? null, catalogUpdatedAt: session.catalogUpdatedAt ?? null, confirmed: true, ...(archive ? { archive: true as const } : {}) });
+      if (archive) {
+        // 归档已由服务确认，后续刷新失败不能改报为归档失败或触发重复提交。
+        try { await refresh(true); } catch (reason) { toast(reason instanceof Error ? reason.message : String(reason)); }
+        if (!silent) toast(t('session.confirmed'));
+        return true;
+      }
+      // 普通确认等待较早的快照结束，避免它覆盖刚收到的人工确认结果。
       if (refreshing.current) await refreshing.current.catch(() => {});
       const current = snapshotRef.current!;
       const next = { ...current, sessions: current.sessions.map(item => item.id === confirmed.id && item.observedAt === confirmed.observedAt && item.event === confirmed.event && (item.turnId ?? null) === (confirmed.turnId ?? null) && (item.catalogUpdatedAt ?? null) === (confirmed.catalogUpdatedAt ?? null) ? { ...item, confirmedAt: confirmed.confirmedAt, confirmationHistory: confirmed.confirmationHistory, activityHistory: confirmed.activityHistory } : item) };
       snapshotRef.current = next; setSnapshot(next);
       if (!silent) toast(t("session.confirmed")); return true;
-    } catch (reason) { if (!silent) toast(reason instanceof Error ? reason.message : String(reason)); return false; }
+    } catch (reason) {
+      // 批次需要原始原因来逐项展示，单条入口继续使用提示消息。
+      if (silent) throw reason;
+      toast(reason instanceof Error ? reason.message : String(reason));
+      return false;
+    }
   };
   const createToday = (draft?: TaskDraft, onCreated?: () => void) => open({ type: 'task', draft, onCreated, planDate: localDay(new Date()), requestId: crypto.randomUUID() });
   const addToday = (data: TaskDraft[], requestId: string) => run(() => mutate({ action: 'create_tasks', data, requestId, planDate: localDay(new Date()) }), data.length > 1 ? t("today.splitAdded", { count: data.length }) : t("today.added"));
@@ -273,7 +334,8 @@ function Workspace() {
     let stopResizeNotifications: (() => void) | undefined;
       const pollState = async () => {
       try {
-        if (Date.now() - lastThreadSync.current > 30000) { lastThreadSync.current = Date.now(); try { await syncThreads(); } catch (reason) { toast(t("session.syncFailed", { value: (reason instanceof Error ? reason.message : String(reason)) })); } }
+        // 本地后台任务的进度不等待较慢的宿主目录同步。
+        if (Date.now() - lastThreadSync.current > 30000) { lastThreadSync.current = Date.now(); void syncThreads().catch(reason => { if (!stopped) toast(t('session.syncFailed', { value: reason instanceof Error ? reason.message : String(reason) })); }); }
         if (stopped) return;
         await refresh();
       } catch (reason) { if (!stopped) setConnectionError((reason instanceof Error ? reason.message : String(reason))); }
@@ -297,6 +359,7 @@ function Workspace() {
         if (stopped) return;
         await refresh(true);
         if (stopped) return;
+        poll = setTimeout(pollState, 5000);
         let projectsChanged = false;
         try { const result = await api('codex', { operation: 'sync_projects' }); projectsChanged = result.added > 0 || result.updated > 0; }
         catch (reason) { if (!stopped) toast(t("project.syncFailed", { value: (reason instanceof Error ? reason.message : String(reason)) })); }
@@ -305,9 +368,11 @@ function Workspace() {
         if (stopped) return;
         if (projectsChanged) await refresh(true);
         const id = location.hash.match(/^#task=([a-f0-9-]+)$/)?.[1]; if (id) await openTask(id);
+        const experienceLink = parseWikiLink(location.hash);
+        if (experienceLink && !embedded) { setExperienceRecord(experienceLink.recordId); setExperienceRevision(experienceLink.revision); setExperienceSession(experienceLink.sessionId); }
       } catch (reason) { if (!stopped) setConnectionError((reason instanceof Error ? reason.message : String(reason))); }
       if (stopped) return;
-      poll = setTimeout(pollState, 5000);
+      if (!poll) poll = setTimeout(pollState, 5000);
     };
     boot();
     return () => {
@@ -318,14 +383,46 @@ function Workspace() {
     };
   }, []);
 
+  // 设置中的默认天数在首次加载或用户修改设置后同步到两个筛选器。
+  useEffect(() => {
+    if (!snapshot) return;
+    const days = snapshot.settings.sessionMaxAgeDays ?? 2;
+    const mode = days ? String(days) : 'all';
+    setRanges(current => ({ pending: { ...current.pending, mode }, completed: { ...current.completed, mode } }));
+  }, [snapshot?.settings.sessionMaxAgeDays]);
+
+  // 根据当前筛选和持久状态组装工作台及其对话框。
   if (!snapshot) return <div className="loading"><h1>{connectionError ? t("connection.disconnected") : t("connection.connecting")}</h1>{connectionError && <><p>{connectionError}</p><p>{t("connection.localApp")}<a href={localOrigin}>{localOrigin}</a></p></>}</div>;
   const setViewValue = (name: string, value: string) => setView(current => ({ ...current, [name]: value }));
   const findTask = (id?: string | null) => snapshot.tasks.find(task => task.id === id);
   const projectName = (id?: string | null) => snapshot.projects.find(project => project.id === id)?.title || t("project.none");
-  const filtered = snapshot.tasks.filter(task => (!view.project || task.projectId === view.project) && (!view.search || `${task.title} ${task.description}`.toLowerCase().includes(view.search.toLowerCase())));
-  const sessionMatches = (session: Snapshot['sessions'][number]) => (session.catalogVisible !== false || ['running', 'queued', 'waiting_approval', 'waiting_input'].includes(session.state)) && (!view.project || snapshot.projects.find(project => project.id === view.project)?.codex?.workspacePath === session.cwd) && (!view.search || `${session.title || ''} ${session.preview || ''}`.toLowerCase().includes(view.search.toLowerCase()));
+  // 时间区间只作用于待确认与已完成；没有创建时间的旧会话不伪造时间。
+  const inRange = (session: Snapshot['sessions'][number], column: string) => {
+    const key = ['waiting_user', 'waiting_confirmation', 'unknown'].includes(column) ? 'pending' : column === 'completed' ? 'completed' : null;
+    if (!key) return true;
+    const range = ranges[key];
+    if (range.mode === 'all') return true;
+    const start = range.mode === 'custom' ? (range.from ? new Date(`${range.from}T00:00:00`).getTime() : -Infinity) : Date.now() - Number(range.mode) * 86400000;
+    const end = range.mode === 'custom' && range.to ? new Date(`${range.to}T23:59:59.999`).getTime() : Infinity;
+    return sessionOverlapsRange(session, { start, end });
+  };
+  const filtered = snapshot.tasks.filter(task => (!task.ai || inRange(task.ai, executionColumnForTask(task))) && (!view.project || task.projectId === view.project) && matchesSessionSearch(view.search, task, task.ai));
+  const sessionMatches = (session: Snapshot['sessions'][number]) => {
+    const task = snapshot.tasks.find(item => item.sessionId === session.id && item.state !== 'cancelled');
+    const project = sessionProject(snapshot.projects, task, session);
+    return (session.catalogVisible !== false || ['running', 'queued', 'waiting_approval', 'waiting_input'].includes(session.state)) && (!view.project || project.id === view.project) && matchesSessionSearch(view.search, task, session);
+  };
   const historySessions = snapshot.sessions.filter(sessionMatches);
-  const filteredSessions = visibleExecutionSessions(historySessions, snapshot.tasks).sort((a, b) => (b.catalogUpdatedAt || b.observedAt).localeCompare(a.catalogUpdatedAt || a.observedAt));
+  const visibleSessions = historySessions.filter(session => { const task = snapshot.tasks.find(item => item.sessionId === session.id && item.state !== 'cancelled'); return inRange(session, task ? executionColumnForTask(task) : executionColumnForSession(session)); });
+  const filteredSessions = visibleExecutionSessions(visibleSessions, snapshot.tasks).sort((a, b) => (b.catalogUpdatedAt || b.observedAt).localeCompare(a.catalogUpdatedAt || a.observedAt));
+  const batchSources = new Map(filteredSessions.map(session => [session.id, session]));
+  for (const task of filtered) if (task.ai) batchSources.set(task.ai.id, task.ai);
+  const batchCandidates = [...batchSources.values()].filter(session => { const task = snapshot.tasks.find(item => item.sessionId === session.id && item.state !== 'cancelled'); return (task ? executionColumnForTask(task) : executionColumnForSession(session)) !== 'completed'; });
+  const openProjectBatch = (projectId: string) => setBatchSessions(batchCandidates.filter(session => {
+    const task = snapshot.tasks.find(item => item.sessionId === session.id && item.state !== 'cancelled');
+    const project = sessionProject(snapshot.projects, task, session).id;
+    return project === projectId && eligibleProjectPending(session, task);
+  }));
   const boardSessionCount = filteredSessions.filter(session => executionColumnForSession(session) !== null).length;
   const elapsedMs = snapshot.focus.totalMs + (snapshot.focus.status === 'running' ? Math.max(0, Date.now() - receivedAt.current) : 0);
   const focusCandidates = snapshot.tasks.filter(task => !['accepted', 'cancelled'].includes(task.state));
@@ -333,6 +430,7 @@ function Workspace() {
   const totals = view.page === 'today' ? dailyTotals(snapshot) : [], dayRows = totals.filter(row => row.day === statsDate);
   const mainPage = ['inbox', 'plans'].includes(view.page) ? 'today' : view.page;
   const newKind = ({ work: 'task', projects: 'project', plans: 'plan' } as Record<string, Kind>)[view.page];
+  // 对话框始终基于最近读取的实体版本提供操作。
   let modalTitle = '', modalDescription = '', modalBody: ReactNode;
   if (modal) {
     const task = modal.task!, entity = modal.entity!;
@@ -366,6 +464,8 @@ function Workspace() {
       modalBody = <div className="editor-details"><p className="note">{t("prompt.identityHint")}</p><textarea aria-label={t("prompt.label")} readOnly value={modal.text} className="execution-prompt" /><div className="actions"><button disabled={busy} onClick={() => run(async () => { try { await navigator.clipboard.writeText(modal.text!); toast(t("prompt.copied")); } catch { document.querySelector<HTMLTextAreaElement>('.execution-prompt')!.select(); toast(t("connection.copyDenied")); } })}>{t("prompt.copy")}</button>{embedded && <button className="primary" disabled={busy} onClick={() => run(async () => { const result = await bridge!.sendMessage({ role: 'user', content: [{ type: 'text', text: modal.text! }] }); if (result.isError) throw new Error(t("connection.sendDenied")); }, t("prompt.sent"), true)}>{t("prompt.send")}</button>}</div></div>;
     }
   }
+  // 多个完成提醒逐个处理；编辑或审核期间先保留未读，避免覆盖正在进行的操作。
+  const readyCapture = !modal && !batchSessions && !experienceSession ? snapshot.sessions.filter(session => session.experiencePreparation?.status === 'ready' && session.experiencePreparation.unread).sort((a, b) => a.experiencePreparation!.updatedAt.localeCompare(b.experiencePreparation!.updatedAt))[0] : undefined;
   return <><div className="workspace-shell"><aside className="workspace-sidebar">
     <div className="workspace-brand"><span>a</span> ai-todos</div>
     <div className="workspace-sidebar__label">{t('workspace.label')}</div>
@@ -373,10 +473,6 @@ function Workspace() {
       <button type="button" className={view.page === 'work' && view.mode !== 'timeline' ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', mode: current.mode === 'timeline' ? 'list' : current.mode }))}><span>◉ &nbsp;{t('nav.work')}</span><small>{filteredSessions.length + filtered.length}</small></button>
       <button type="button" className={view.page === 'work' && view.mode === 'timeline' ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', mode: 'timeline' }))}><span>◷ &nbsp;{t('workspace.history')}</span></button>
     </nav>
-    <div className="workspace-sidebar__projects"><div className="workspace-sidebar__label">{t('workspace.projects')}</div><nav className="workspace-sidebar__nav" aria-label={t('workspace.projects')}>
-      <button type="button" className={!view.project ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', project: '' }))}><span>{t('workspace.allProjects')}</span></button>
-      {snapshot.projects.map(project => <button type="button" key={project.id} className={view.project === project.id ? 'is-active' : ''} onClick={() => setView(current => ({ ...current, page: 'work', project: project.id }))}><span>{project.title}</span></button>)}
-    </nav></div>
     <button type="button" className="workspace-sidebar__settings" onClick={() => setView(current => ({ ...current, page: 'settings' }))}><Settings size={15} />{t('nav.settings')}</button>
   </aside><main className={`main workspace-main ${view.page === 'work' && view.mode === 'board' ? 'is-board' : ''}`}>
     <header className="page-header workspace-header"><div><h1>{view.page === 'work' && view.mode === 'timeline' ? t('workspace.history') : t(pages[view.page])}</h1>{view.page === 'work' && <p className="workspace-subtitle">{t(view.mode === 'timeline' ? 'activity.hint' : 'workspace.subtitle')}</p>}</div><div className="row">{hostContext?.availableDisplayModes?.includes('fullscreen') && hostContext.displayMode !== 'fullscreen' && <button className="quiet small" disabled={busy} onClick={fullscreen}><Maximize2 size={14} aria-hidden="true" />{t('connection.fullscreen')}</button>}<button className="quiet small" disabled={busy} onClick={view.page === 'work' ? syncWorkspace : () => run(() => refresh(true))}><RefreshCw size={14} />{t('common.refresh')}</button></div></header>
@@ -393,20 +489,26 @@ function Workspace() {
     {view.page === 'work' && <section className={`execution-view ${view.mode === 'board' ? 'is-board' : ''}`}>
       {view.mode !== 'timeline' && <div className="execution-toolbar workspace-toolbar"><div className="segmented-control">{[['list', t('workspace.list')], ['board', t('board.mode')]].map(([mode, label]) => <button key={mode} className={view.mode === mode ? 'is-active' : ''} aria-pressed={view.mode === mode} onClick={() => setViewValue('mode', mode)}>{label}</button>)}</div>
         <label className="task-search"><Search size={14} aria-hidden="true" /><input type="search" aria-label={t('board.search')} placeholder={t('board.searchPlaceholder')} value={view.search} onChange={event => setViewValue('search', event.target.value)} /></label>
+        <button type="button" aria-pressed={groupProjects} className="quiet small" onClick={() => setGroupProjects(value => !value)}>{t('batch.groupProjects')} {groupProjects ? '✓' : ''}</button>
+        <button type="button" className="quiet small" disabled={!batchCandidates.length || busy} onClick={() => setBatchSessions(batchCandidates)}>{t('batch.completeAll')}</button>
         <ProjectPicker value={view.project} projects={snapshot.projects} onChange={value => setViewValue('project', value)} disabled={!snapshot.projects.length} />
       </div>}
+      {view.mode !== 'timeline' && <div className="session-date-ranges">{(['pending', 'completed'] as const).map(key => <label key={key}>{t(key === 'pending' ? 'batch.pendingRange' : 'batch.completedRange')} <select value={ranges[key].mode} onChange={event => setRanges(current => ({ ...current, [key]: { ...current[key], mode: event.target.value } }))}><option value="2">{t('batch.lastTwoDays')}</option><option value="7">{t('batch.lastSevenDays')}</option>{!(['2', '7', 'all', 'custom'].includes(ranges[key].mode)) && <option value={ranges[key].mode}>{t('batch.lastDays', { count: Number(ranges[key].mode) })}</option>}<option value="all">{t('batch.allTime')}</option><option value="custom">{t('batch.custom')}</option></select>{ranges[key].mode === 'custom' && <><input type="date" aria-label={t('batch.startDate')} value={ranges[key].from} onChange={event => setRanges(current => ({ ...current, [key]: { ...current[key], from: event.target.value } }))} /><input type="date" aria-label={t('batch.endDate')} value={ranges[key].to} onChange={event => setRanges(current => ({ ...current, [key]: { ...current[key], to: event.target.value } }))} /></>}{ranges[key].mode === 'custom' && ranges[key].from && ranges[key].to && ranges[key].from > ranges[key].to && <span role="alert">{t('batch.invalidRange')}</span>}</label>)}</div>}
       {threadTransport === 'history' && !snapshot.sessions.some(session => session.source === 'codex-hook') && <p className="note" role="status">{t('connection.hookSetup')}</p>}
-      {view.mode === 'list' ? <SessionList tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenSession={openSession} onConfirmSession={confirmSession} onCompleteTask={completeTask} onReviewTask={review} onOpenCodex={openCodex} onHistory={() => setViewValue('mode', 'timeline')} /> : view.mode === 'board' ? <BoardView tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} onOpenSession={openSession} onConfirmSession={confirmSession} onReviewTask={review} onCompleteTask={completeTask} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenCodex={openCodex} onTransition={transition} onError={toast} /> : <SessionHistory sessions={historySessions} tasks={snapshot.tasks} onOpenSession={openSession} />}
+      {view.mode === 'list' ? <SessionList tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenSession={openSession} onConfirmSession={confirmSession} onCompleteTask={completeTask} onReviewTask={review} onOpenCodex={openCodex} onExperience={openExperience} onSummary={summarizeSession} grouped={groupProjects} onBatchProject={openProjectBatch} onArchive={session => setBatchSessions([session])} onHistory={() => setViewValue('mode', 'timeline')} /> : view.mode === 'board' ? <BoardView tasks={filtered} allTasks={snapshot.tasks} sessions={filteredSessions} onOpenSession={openSession} onConfirmSession={confirmSession} onReviewTask={review} onCompleteTask={completeTask} projects={snapshot.projects} busy={busy} onOpenTask={openTask} onOpenCodex={openCodex} onTransition={transition} onError={toast} onExperience={openExperience} onSummary={summarizeSession} grouped={groupProjects} onBatchProject={openProjectBatch} onArchive={session => setBatchSessions([session])} /> : <SessionHistory sessions={historySessions} tasks={snapshot.tasks} onOpenSession={openSession} />}
     </section>}
     {view.page === 'projects' && <div className="grid">{snapshot.projects.map(project => {
       const tasks = snapshot.tasks.filter(task => task.projectId === project.id), accepted = tasks.filter(task => task.state === 'accepted').length;
       return <article className="card" key={project.id}><div className="row spaced"><h2>{project.title}</h2><button className="small" disabled={busy} onClick={() => openEntity('project', project)}>{t("common.edit")}</button></div>{project.codex && <p className="project-path">Codex · {project.codex.workspacePath}</p>}<p className="muted">{project.description || t("project.noDescription")}</p><div className="progress-track"><span style={{ width: `${tasks.length ? accepted / tasks.length * 100 : 0}%` }} /></div><div className="row spaced"><span className="muted">{t("project.acceptedCount", { accepted: accepted, count: tasks.length })}</span><button className="small" onClick={() => setView(current => ({ ...current, page: 'work', project: project.id }))}>{t("project.viewTasks")}</button></div></article>;
     })}{!snapshot.projects.length && <div className="empty-state"><strong>{t("project.organize")}</strong><span>{t("project.sharedTasks")}</span></div>}</div>}
     {view.page === 'plans' && <div className="list"><p className="muted">{t("plan.description")}</p>{[...snapshot.plans].sort((left, right) => right.date.localeCompare(left.date)).map(plan => <article className="card" key={plan.id}><div className="row spaced"><div><span className="muted">{plan.date}</span><h2>{plan.title}</h2></div><button className="small" disabled={busy} onClick={() => openEntity('plan', plan)}>{t("plan.edit")}</button></div><p className="muted">{plan.note}</p><div className="list">{plan.taskIds.map(id => <div className="row spaced" key={id}><button className="quiet" onClick={() => openTask(id)}>{findTask(id)?.title || t("task.deleted")}</button><span className="execution-status">{t(labels[findTask(id)?.state ?? ''] || 'common.unknown')}</span></div>)}{!plan.taskIds.length && <span className="muted">{t("plan.emptyTasks")}</span>}</div></article>)}{!snapshot.plans.length && <div className="empty-state"><strong>{t("plan.emptyTitle")}</strong><span>{t("plan.emptyHint")}</span></div>}</div>}
-    {view.page === 'settings' && <div className="grid settings-grid"><section className="card"><h2>{t('settings.language')}</h2><SelectField label={t('settings.language')} value={getLanguagePreference()} disabled={busy} onValueChange={value => { if (!setLanguagePreference(value as LanguagePreference)) toast(t('settings.languageStorageFailed')); }} groups={[{ options: [{ value: 'auto', label: t('settings.followSystem') }, ...Object.entries(languages).map(([value, { name }]) => ({ value, label: name }))] }]} /><p className="note">{t('settings.languageHint')}</p></section></div>}
+    {view.page === 'settings' && <div className="grid settings-grid"><section className="card"><h2>{t('settings.sessionAge')}</h2><form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); const days = Number(data.get('sessionMaxAgeDays')); if (!Number.isInteger(days) || days < 0 || days > 36500) return; const { revision, ...settings } = snapshot.settings; void run(() => mutate({ action: 'settings', revision, data: { ...settings, sessionMaxAgeDays: days } }), t('settings.sessionAgeSaved')); }}><label>{t('settings.sessionAgeDays')} <input name="sessionMaxAgeDays" type="number" min="0" max="36500" defaultValue={snapshot.settings.sessionMaxAgeDays ?? 0} key={snapshot.settings.sessionMaxAgeDays ?? 0} /></label> <button type="submit" disabled={busy}>{t('common.save')}</button></form><p className="note">{t('settings.sessionAgeHint')}</p></section><section className="card"><h2>{t('settings.language')}</h2><SelectField label={t('settings.language')} value={getLanguagePreference()} disabled={busy} onValueChange={value => { if (!setLanguagePreference(value as LanguagePreference)) toast(t('settings.languageStorageFailed')); }} groups={[{ options: [{ value: 'auto', label: t('settings.followSystem') }, ...Object.entries(languages).map(([value, { name }]) => ({ value, label: name }))] }]} /><p className="note">{t('settings.languageHint')}</p></section></div>}
   </main></div>
 
+    {experienceSession && <WikiExperience key={experienceSession} sessionId={experienceSession} initialRecordId={experienceRecord} initialRevision={experienceRevision} embedded={embedded} browserOrigin={localOrigin} call={api} onClose={() => setExperienceSession(null)} />}
+    {batchSessions && <SessionBatchDialog sessions={batchSessions} onClose={() => setBatchSessions(null)} onConfirm={session => confirmSession(session, true, true)} onFinished={count => toast(t('batch.success', { count }))} onRefresh={async () => { const scope = new Set(batchSessions.map(session => session.id)); const fresh = await refresh(true); return fresh.sessions.filter(session => scope.has(session.id)); }} />}
     {modal && <EditorDialog key={modal.key} title={modalTitle} description={modalDescription} busy={busy} error={error} onClose={() => setModal(modal.returnTo || null)}>{modalBody}</EditorDialog>}
+    {readyCapture && <ExperienceReadyNotice title={readyCapture.title || readyCapture.id} busy={busy} onOpen={() => openExperience(readyCapture.id)} onLater={() => deferCaptureNotice(readyCapture.id, readyCapture.experiencePreparation!.id)} />}
     {message && <div className="toast" role="status" aria-live="polite">{message}</div>}
   </>;
 }

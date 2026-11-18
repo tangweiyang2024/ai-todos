@@ -1,3 +1,5 @@
+import type { ExperienceProgress } from './experience-chat.ts';
+import type { ExperiencePreparationView } from './experience-preparation.ts';
 import type { z } from 'zod';
 import type { schemas, settingsSchema, commandSchema } from './domain.ts';
 
@@ -13,10 +15,11 @@ export interface SessionActivity { at: string; state: string; turnId: string | n
 export interface SessionConfirmation { at: string; observedAt: string; event: string; turnId: string | null; catalogUpdatedAt: string | null }
 export interface Session {
   id: string; cwd: string; observedState: string; observedAt: string; event: string;
-  turnId?: string | null; source: string; title?: string; preview?: string;
-  codexProjectId?: string | null; catalogUpdatedAt?: string; catalogVisible?: boolean; confirmedAt?: string; confirmationHistory?: SessionConfirmation[]; activityHistory?: SessionActivity[];
+  turnId?: string | null; experienceStartedAt?: string; source: string; title?: string; preview?: string;
+  codexProjectId?: string | null; catalogCreatedAt?: string; archiveConfirmed?: boolean; catalogUpdatedAt?: string; catalogVisible?: boolean; confirmedAt?: string; confirmationHistory?: SessionConfirmation[]; activityHistory?: SessionActivity[];
 }
-export type LiveSession = Session & { state: string; stateConfidence?: 'last_observed'; mode?: 'planning' | 'execution' };
+export interface SessionSummary { format?: 'goal'; text: string; sourceUpdatedAt: string; partial: boolean }
+export type LiveSession = Session & { summary?: SessionSummary; summaryStatus?: string; state: string; stateConfidence?: 'last_observed'; mode?: 'planning' | 'execution'; experience?: ExperienceProgress; experiencePreparation?: ExperiencePreparationView };
 export type Task = EntityData<'task'> & EntityMeta & {
   state: TaskState; sessionId: string | null; ai?: LiveSession | null; delivery?: Delivery; review?: Review;
   capture?: { id: string; title: string; capturedAt: string };
@@ -36,7 +39,7 @@ export interface Notice { id: string; key: string; title: string; taskId: string
 export interface TaskEvent { id: string; at: string; type: string; revision?: number; state?: TaskState; sessionId?: string | null; delivery?: Delivery; decision?: Review['decision']; reviewer?: string; note?: string; reviewedRevision?: number; durationMs?: number }
 export interface Snapshot { tasks: Task[]; projects: Project[]; objectives: Objective[]; keyResults: KeyResult[]; plans: Plan[]; inbox: InboxItem[]; sessions: LiveSession[]; focus: Focus & { totalMs: number }; settings: Settings; notices: Notice[]; timeRecords: TimeRecord[]; serverTime: string; csrf?: string }
 export interface CodexProject { projectId: string; workspacePath: string; title: string }
-export interface CodexThread { id: string; title: string; preview?: string; cwd: string; projectId?: string | null; updatedAt: string; state: string; observation?: Pick<Session, 'observedAt' | 'event' | 'source' | 'turnId'> }
+export interface CodexThread { id: string; title: string; preview?: string; cwd: string; projectId?: string | null; createdAt?: string; updatedAt: string; state: string; observation?: Pick<Session, 'observedAt' | 'event' | 'source' | 'turnId' | 'experienceStartedAt'> }
 export interface ServiceRuntime { pid: number; origin: string; token: string }
 export type CommandInput = z.input<typeof commandSchema>;
 export type TransitionState = Extract<Command, { action: 'transition' }>['state'];

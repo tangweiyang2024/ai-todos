@@ -79,6 +79,16 @@ codex plugin add ai-todos@ai-todos
 - **设置**：选择跟随系统、简体中文或 English。语言切换立即生效，用户内容保留原文。
 
 
+## 从会话沉淀经验
+
+在原会话或任务卡片点击 **沉淀经验**，后台准备独立 Codex 聊天，卡片显示进度。准备完成后弹窗提醒，可选择 **进入沉淀会话** 或 **稍后**，不会自动切换窗口。用户进入后选择模型并发送预填提示词。再次点击 **继续沉淀** 会复用原聊天；已有轮次时不重复填入提示词。
+
+ai-todos 只准备可信原文快照和任务说明、维护会话关联、显示卡片进度。经验筛选、人工讨论、Wiki 查重/冲突、完整 ingest、diff 和正式写入都在 Codex 聊天中完成。提示词要求先读本地 wiki-ingest 和 Vault/Wiki 规范，展示拟修改内容并等待明确批准。普通会话的批准属于提示词约束，不是旧网页票据的强制门禁。
+
+卡片区分运行、等待确认、本轮结束和“会话报告已入库”；Stop 不表示入库成功。详细阶段由聊天回报，无法同步时明确显示未知。沉淀聊天本身不会成为另一张普通看板卡片。新一轮活动会使旧完成回报失效。
+
+原文以私有不可变 JSONL 和索引保存在本机 dataDir/experience-chats，原文不会塞入跳转 URL。默认 Wiki 为 `~/Documents/Obsidian Vault/40-LLM-Wiki/wiki`；可设置 `AI_TODOS_WIKI_ROOT`、`AI_TODOS_VAULT_ROOT` 和 `AI_TODOS_WIKI_INGEST_SKILL`。旧候选与审核历史继续保留。详见 [会话交接说明](docs/experience-chat-handoff.md)。
+
 ## 从源码运行
 
 需要 Node.js 24+ 和 npm。

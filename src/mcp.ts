@@ -7,6 +7,7 @@ import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from '@model
 import { z } from 'zod';
 import { commandSchema, sessionConfirmSchema, taskCompleteSchema, errorPayload } from './domain.ts';
 import { codexActionSchema } from './codex.ts';
+import { wikiBridgeSchema } from './wiki-action-schema.ts';
 import { ensureService, service } from './service-client.ts';
 import { origin } from './paths.ts';
 import pkg from '../package.json' with { type: 'json' };
@@ -37,6 +38,8 @@ server.registerTool('ai_todos_manage', {
   inputSchema: z.object({ command: commandSchema }), annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false }, _meta: { ui: { visibility: ['model', 'app'] } },
 }, guarded((args: { command: z.output<typeof commandSchema> }) => service('command', args.command)));
 server.registerTool('ai_todos_codex', { description: 'Sync Codex projects and conversations, prepare and bind a task conversation, open an observed session in the desktop app, or generate a definition suggestion. Creating/opening a session does not execute or accept a task.', inputSchema: z.object({ action: codexActionSchema }), annotations: { readOnlyHint: false, openWorldHint: true }, _meta: { ui: { visibility: ['app'] } } }, guarded((args: { action: z.output<typeof codexActionSchema> }) => service('codex', args.action)));
+// 仅嵌入式应用可调用；模型不可直接看到人工审核及 Wiki 写入工具。
+server.registerTool('ai_todos_wiki', { description: 'App UI only: open or reuse a native Codex experience conversation with prepared source and instructions. Legacy Wiki candidate history and local review remain available. This tool cannot approve or write the Wiki.', inputSchema: wikiBridgeSchema, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false }, _meta: { ui: { visibility: ['app'] } } }, guarded(args => service('wiki', { ...args, bridgeRevision: 1 })));
 server.registerTool('ai_todos_confirm_session', { description: 'Record the human UI action confirming an unbound, stopped conversation complete at its displayed observation. This is not business task acceptance.', inputSchema: sessionConfirmSchema, annotations: { readOnlyHint: false, openWorldHint: false }, _meta: { ui: { visibility: ['app'] } } }, guarded((args: z.output<typeof sessionConfirmSchema>) => service('session-confirm', args)));
 registerAppResource(server, 'ai-todos workspace', uri, { description: 'Persistent local productivity workspace' } as ResourceMetadata, async () => ({ contents: [{ uri, mimeType: RESOURCE_MIME_TYPE, text: readFileSync(new URL('../dist/app.html', import.meta.url), 'utf8').replaceAll('__AI_TODOS_ORIGIN__', origin), _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: false }, 'openai/ui': { availableDisplayModes: ['inline', 'fullscreen'] } } }] }));
 server.registerTool('ai_todos_complete_task', { description: 'Record an explicit human UI action confirming the displayed revision of a stopped task complete. Not available to AI.', inputSchema: taskCompleteSchema, annotations: { readOnlyHint: false, openWorldHint: false }, _meta: { ui: { visibility: ['app'] } } }, guarded((args: z.output<typeof taskCompleteSchema>) => service('task-complete', args)));

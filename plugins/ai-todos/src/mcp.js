@@ -2241,10 +2241,10 @@ var require_resolve = __commonJS({
       }
       return count;
     }
-    function getFullPath(resolver, id2 = "", normalize2) {
+    function getFullPath(resolver, id3 = "", normalize2) {
       if (normalize2 !== false)
-        id2 = normalizeId(id2);
-      const p = resolver.parse(id2);
+        id3 = normalizeId(id3);
+      const p = resolver.parse(id3);
       return _getFullPath(resolver, p);
     }
     exports.getFullPath = getFullPath;
@@ -2254,13 +2254,13 @@ var require_resolve = __commonJS({
     }
     exports._getFullPath = _getFullPath;
     var TRAILING_SLASH_HASH = /#\/?$/;
-    function normalizeId(id2) {
-      return id2 ? id2.replace(TRAILING_SLASH_HASH, "") : "";
+    function normalizeId(id3) {
+      return id3 ? id3.replace(TRAILING_SLASH_HASH, "") : "";
     }
     exports.normalizeId = normalizeId;
-    function resolveUrl(resolver, baseId, id2) {
-      id2 = normalizeId(id2);
-      return resolver.resolve(baseId, id2);
+    function resolveUrl(resolver, baseId, id3) {
+      id3 = normalizeId(id3);
+      return resolver.resolve(baseId, id3);
     }
     exports.resolveUrl = resolveUrl;
     var ANCHOR = /^[a-z_][-a-z0-9._]*$/i;
@@ -2990,7 +2990,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve2.call(this, root, ref);
+      let _sch = resolve3.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a3 = root.localRefs) === null || _a3 === void 0 ? void 0 : _a3[ref];
         const { schemaId } = this.opts;
@@ -3017,7 +3017,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve2(root, ref) {
+    function resolve3(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3030,8 +3030,8 @@ var require_compile = __commonJS({
       if (Object.keys(root.schema).length > 0 && refPath === baseId) {
         return getJsonPointer.call(this, p, root);
       }
-      const id2 = (0, resolve_1.normalizeId)(refPath);
-      const schOrRef = this.refs[id2] || this.schemas[id2];
+      const id3 = (0, resolve_1.normalizeId)(refPath);
+      const schOrRef = this.refs[id3] || this.schemas[id3];
       if (typeof schOrRef == "string") {
         const sch = resolveSchema.call(this, root, schOrRef);
         if (typeof (sch === null || sch === void 0 ? void 0 : sch.schema) !== "object")
@@ -3042,7 +3042,7 @@ var require_compile = __commonJS({
         return;
       if (!schOrRef.validate)
         compileSchema.call(this, schOrRef);
-      if (id2 === (0, resolve_1.normalizeId)(ref)) {
+      if (id3 === (0, resolve_1.normalizeId)(ref)) {
         const { schema } = schOrRef;
         const { schemaId } = this.opts;
         const schId = schema[schemaId];
@@ -3847,7 +3847,7 @@ var require_fast_uri = __commonJS({
       }
       return uri2;
     }
-    function resolve2(baseURI, relativeURI, options) {
+    function resolve3(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -3880,49 +3880,49 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative, options, skipNormalization) {
+    function resolveComponent(base, relative2, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse3(serialize(base, options), options);
-        relative = parse3(serialize(relative, options), options);
+        relative2 = parse3(serialize(relative2, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative.scheme) {
-        target.scheme = relative.scheme;
-        target.userinfo = relative.userinfo;
-        target.host = relative.host;
-        target.port = relative.port;
-        target.path = removeDotSegments(relative.path || "");
-        target.query = relative.query;
+      if (!options.tolerant && relative2.scheme) {
+        target.scheme = relative2.scheme;
+        target.userinfo = relative2.userinfo;
+        target.host = relative2.host;
+        target.port = relative2.port;
+        target.path = removeDotSegments(relative2.path || "");
+        target.query = relative2.query;
       } else {
-        if (relative.userinfo !== void 0 || relative.host !== void 0 || relative.port !== void 0) {
-          target.userinfo = relative.userinfo;
-          target.host = relative.host;
-          target.port = relative.port;
-          target.path = removeDotSegments(relative.path || "");
-          target.query = relative.query;
+        if (relative2.userinfo !== void 0 || relative2.host !== void 0 || relative2.port !== void 0) {
+          target.userinfo = relative2.userinfo;
+          target.host = relative2.host;
+          target.port = relative2.port;
+          target.path = removeDotSegments(relative2.path || "");
+          target.query = relative2.query;
         } else {
-          if (!relative.path) {
+          if (!relative2.path) {
             target.path = base.path;
-            if (relative.query !== void 0) {
-              target.query = relative.query;
+            if (relative2.query !== void 0) {
+              target.query = relative2.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative.path[0] === "/") {
-              target.path = removeDotSegments(relative.path);
+            if (relative2.path[0] === "/") {
+              target.path = removeDotSegments(relative2.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative.path;
+                target.path = "/" + relative2.path;
               } else if (!base.path) {
-                target.path = relative.path;
+                target.path = relative2.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative2.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative.query;
+            target.query = relative2.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -3930,7 +3930,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative.fragment;
+      target.fragment = relative2.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -4216,7 +4216,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize: normalize2,
-      resolve: resolve2,
+      resolve: resolve3,
       resolveComponent,
       equal,
       serialize,
@@ -4469,15 +4469,15 @@ var require_core = __commonJS({
             this.addSchema(sch, void 0, _meta, _validateSchema);
           return this;
         }
-        let id2;
+        let id3;
         if (typeof schema === "object") {
           const { schemaId } = this.opts;
-          id2 = schema[schemaId];
-          if (id2 !== void 0 && typeof id2 != "string") {
+          id3 = schema[schemaId];
+          if (id3 !== void 0 && typeof id3 != "string") {
             throw new Error(`schema ${schemaId} must be string`);
           }
         }
-        key = (0, resolve_1.normalizeId)(key || id2);
+        key = (0, resolve_1.normalizeId)(key || id3);
         this._checkUnique(key);
         this.schemas[key] = this._addSchema(schema, _meta, key, _validateSchema, true);
         return this;
@@ -4556,11 +4556,11 @@ var require_core = __commonJS({
           case "object": {
             const cacheKey = schemaKeyRef;
             this._cache.delete(cacheKey);
-            let id2 = schemaKeyRef[this.opts.schemaId];
-            if (id2) {
-              id2 = (0, resolve_1.normalizeId)(id2);
-              delete this.schemas[id2];
-              delete this.refs[id2];
+            let id3 = schemaKeyRef[this.opts.schemaId];
+            if (id3) {
+              id3 = (0, resolve_1.normalizeId)(id3);
+              delete this.schemas[id3];
+              delete this.refs[id3];
             }
             return this;
           }
@@ -4667,10 +4667,10 @@ var require_core = __commonJS({
         }
       }
       _addSchema(schema, meta3, baseId, validateSchema = this.opts.validateSchema, addSchema = this.opts.addUsedSchema) {
-        let id2;
+        let id3;
         const { schemaId } = this.opts;
         if (typeof schema == "object") {
-          id2 = schema[schemaId];
+          id3 = schema[schemaId];
         } else {
           if (this.opts.jtd)
             throw new Error("schema must be object");
@@ -4680,7 +4680,7 @@ var require_core = __commonJS({
         let sch = this._cache.get(schema);
         if (sch !== void 0)
           return sch;
-        baseId = (0, resolve_1.normalizeId)(id2 || baseId);
+        baseId = (0, resolve_1.normalizeId)(id3 || baseId);
         const localRefs = resolve_1.getSchemaRefs.call(this, schema, baseId);
         sch = new compile_1.SchemaEnv({ schema, schemaId, meta: meta3, baseId, localRefs });
         this._cache.set(sch.schema, sch);
@@ -4693,9 +4693,9 @@ var require_core = __commonJS({
           this.validateSchema(schema, true);
         return sch;
       }
-      _checkUnique(id2) {
-        if (this.schemas[id2] || this.refs[id2]) {
-          throw new Error(`schema with key or id "${id2}" already exists`);
+      _checkUnique(id3) {
+        if (this.schemas[id3] || this.refs[id3]) {
+          throw new Error(`schema with key or id "${id3}" already exists`);
         }
       }
       _compileSchemaEnv(sch) {
@@ -6894,8 +6894,8 @@ var require_formats = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
-    function fmtDef(validate2, compare) {
-      return { validate: validate2, compare };
+    function fmtDef(validate2, compare2) {
+      return { validate: validate2, compare: compare2 };
     }
     exports.fullFormats = {
       // date: http://tools.ietf.org/html/rfc3339#section-5.6
@@ -7179,8 +7179,8 @@ var require_dist = __commonJS({
         return ajv;
       }
       const [formats, exportName] = opts.mode === "fast" ? [formats_1.fastFormats, fastName] : [formats_1.fullFormats, fullName];
-      const list = opts.formats || formats_1.formatNames;
-      addFormats(ajv, list, formats, exportName);
+      const list2 = opts.formats || formats_1.formatNames;
+      addFormats(ajv, list2, formats, exportName);
       if (opts.keywords)
         (0, limit_1.default)(ajv);
       return ajv;
@@ -7192,11 +7192,11 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs, exportName) {
+    function addFormats(ajv, list2, fs, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
-      for (const f of list)
+      for (const f of list2)
         ajv.addFormat(f, fs[f]);
     }
     module.exports = exports = formatsPlugin;
@@ -7234,13 +7234,13 @@ var require_buffer_util = __commonJS({
     "use strict";
     var { EMPTY_BUFFER } = require_constants();
     var FastBuffer = Buffer[Symbol.species];
-    function concat(list, totalLength) {
-      if (list.length === 0) return EMPTY_BUFFER;
-      if (list.length === 1) return list[0];
+    function concat(list2, totalLength) {
+      if (list2.length === 0) return EMPTY_BUFFER;
+      if (list2.length === 1) return list2[0];
       const target = Buffer.allocUnsafe(totalLength);
       let offset = 0;
-      for (let i = 0; i < list.length; i++) {
-        const buf = list[i];
+      for (let i = 0; i < list2.length; i++) {
+        const buf = list2[i];
         target.set(buf, offset);
         offset += buf.length;
       }
@@ -9026,14 +9026,14 @@ var require_sender = __commonJS({
        * @param {Function} [cb] Callback
        * @private
        */
-      sendFrame(list, cb) {
-        if (list.length === 2) {
+      sendFrame(list2, cb) {
+        if (list2.length === 2) {
           this._socket.cork();
-          this._socket.write(list[0]);
-          this._socket.write(list[1], cb);
+          this._socket.write(list2[0]);
+          this._socket.write(list2[1], cb);
           this._socket.uncork();
         } else {
-          this._socket.write(list[0], cb);
+          this._socket.write(list2[0], cb);
         }
       }
     };
@@ -9299,7 +9299,7 @@ var require_extension = __commonJS({
       let inQuotes = false;
       let extensionName;
       let paramName;
-      let start = -1;
+      let start2 = -1;
       let code = -1;
       let end = -1;
       let i = 0;
@@ -9307,45 +9307,45 @@ var require_extension = __commonJS({
         code = header.charCodeAt(i);
         if (extensionName === void 0) {
           if (end === -1 && tokenChars[code] === 1) {
-            if (start === -1) start = i;
+            if (start2 === -1) start2 = i;
           } else if (i !== 0 && (code === 32 || code === 9)) {
-            if (end === -1 && start !== -1) end = i;
+            if (end === -1 && start2 !== -1) end = i;
           } else if (code === 59 || code === 44) {
-            if (start === -1) {
+            if (start2 === -1) {
               throw new SyntaxError(`Unexpected character at index ${i}`);
             }
             if (end === -1) end = i;
-            const name = header.slice(start, end);
+            const name = header.slice(start2, end);
             if (code === 44) {
               push(offers, name, params);
               params = /* @__PURE__ */ Object.create(null);
             } else {
               extensionName = name;
             }
-            start = end = -1;
+            start2 = end = -1;
           } else {
             throw new SyntaxError(`Unexpected character at index ${i}`);
           }
         } else if (paramName === void 0) {
           if (end === -1 && tokenChars[code] === 1) {
-            if (start === -1) start = i;
+            if (start2 === -1) start2 = i;
           } else if (code === 32 || code === 9) {
-            if (end === -1 && start !== -1) end = i;
+            if (end === -1 && start2 !== -1) end = i;
           } else if (code === 59 || code === 44) {
-            if (start === -1) {
+            if (start2 === -1) {
               throw new SyntaxError(`Unexpected character at index ${i}`);
             }
             if (end === -1) end = i;
-            push(params, header.slice(start, end), true);
+            push(params, header.slice(start2, end), true);
             if (code === 44) {
               push(offers, extensionName, params);
               params = /* @__PURE__ */ Object.create(null);
               extensionName = void 0;
             }
-            start = end = -1;
-          } else if (code === 61 && start !== -1 && end === -1) {
-            paramName = header.slice(start, i);
-            start = end = -1;
+            start2 = end = -1;
+          } else if (code === 61 && start2 !== -1 && end === -1) {
+            paramName = header.slice(start2, i);
+            start2 = end = -1;
           } else {
             throw new SyntaxError(`Unexpected character at index ${i}`);
           }
@@ -9354,13 +9354,13 @@ var require_extension = __commonJS({
             if (tokenChars[code] !== 1) {
               throw new SyntaxError(`Unexpected character at index ${i}`);
             }
-            if (start === -1) start = i;
+            if (start2 === -1) start2 = i;
             else if (!mustUnescape) mustUnescape = true;
             isEscaping = false;
           } else if (inQuotes) {
             if (tokenChars[code] === 1) {
-              if (start === -1) start = i;
-            } else if (code === 34 && start !== -1) {
+              if (start2 === -1) start2 = i;
+            } else if (code === 34 && start2 !== -1) {
               inQuotes = false;
               end = i;
             } else if (code === 92) {
@@ -9371,15 +9371,15 @@ var require_extension = __commonJS({
           } else if (code === 34 && header.charCodeAt(i - 1) === 61) {
             inQuotes = true;
           } else if (end === -1 && tokenChars[code] === 1) {
-            if (start === -1) start = i;
-          } else if (start !== -1 && (code === 32 || code === 9)) {
+            if (start2 === -1) start2 = i;
+          } else if (start2 !== -1 && (code === 32 || code === 9)) {
             if (end === -1) end = i;
           } else if (code === 59 || code === 44) {
-            if (start === -1) {
+            if (start2 === -1) {
               throw new SyntaxError(`Unexpected character at index ${i}`);
             }
             if (end === -1) end = i;
-            let value = header.slice(start, end);
+            let value = header.slice(start2, end);
             if (mustUnescape) {
               value = value.replace(/\\/g, "");
               mustUnescape = false;
@@ -9391,17 +9391,17 @@ var require_extension = __commonJS({
               extensionName = void 0;
             }
             paramName = void 0;
-            start = end = -1;
+            start2 = end = -1;
           } else {
             throw new SyntaxError(`Unexpected character at index ${i}`);
           }
         }
       }
-      if (start === -1 || inQuotes || code === 32 || code === 9) {
+      if (start2 === -1 || inQuotes || code === 32 || code === 9) {
         throw new SyntaxError("Unexpected end of input");
       }
       if (end === -1) end = i;
-      const token = header.slice(start, end);
+      const token = header.slice(start2, end);
       if (extensionName === void 0) {
         push(offers, token, params);
       } else {
@@ -10449,34 +10449,34 @@ var require_subprotocol = __commonJS({
     var { tokenChars } = require_validation2();
     function parse3(header) {
       const protocols = /* @__PURE__ */ new Set();
-      let start = -1;
+      let start2 = -1;
       let end = -1;
       let i = 0;
       for (i; i < header.length; i++) {
         const code = header.charCodeAt(i);
         if (end === -1 && tokenChars[code] === 1) {
-          if (start === -1) start = i;
+          if (start2 === -1) start2 = i;
         } else if (i !== 0 && (code === 32 || code === 9)) {
-          if (end === -1 && start !== -1) end = i;
+          if (end === -1 && start2 !== -1) end = i;
         } else if (code === 44) {
-          if (start === -1) {
+          if (start2 === -1) {
             throw new SyntaxError(`Unexpected character at index ${i}`);
           }
           if (end === -1) end = i;
-          const protocol2 = header.slice(start, end);
+          const protocol2 = header.slice(start2, end);
           if (protocols.has(protocol2)) {
             throw new SyntaxError(`The "${protocol2}" subprotocol is duplicated`);
           }
           protocols.add(protocol2);
-          start = end = -1;
+          start2 = end = -1;
         } else {
           throw new SyntaxError(`Unexpected character at index ${i}`);
         }
       }
-      if (start === -1 || end !== -1) {
+      if (start2 === -1 || end !== -1) {
         throw new SyntaxError("Unexpected end of input");
       }
-      const protocol = header.slice(start, i);
+      const protocol = header.slice(start2, i);
       if (protocols.has(protocol)) {
         throw new SyntaxError(`The "${protocol}" subprotocol is duplicated`);
       }
@@ -15232,9 +15232,9 @@ function nullish(input2) {
   return input2 === null || input2 === void 0;
 }
 function cleanRegex(source) {
-  const start = source.startsWith("^") ? 1 : 0;
+  const start2 = source.startsWith("^") ? 1 : 0;
   const end = source.endsWith("$") ? source.length - 1 : source.length;
-  return source.slice(start, end);
+  return source.slice(start2, end);
 }
 function floatSafeRemainder2(val, step) {
   const ratio = val / step;
@@ -15693,9 +15693,9 @@ function prefixIssues(path, issues) {
 function unwrapMessage(message) {
   return typeof message === "string" ? message : message?.message;
 }
-function attachSchema(issues, start, inst) {
+function attachSchema(issues, start2, inst) {
   var _a3;
-  for (let i = start; i < issues.length; i++) {
+  for (let i = start2; i < issues.length; i++) {
     (_a3 = issues[i]).schema ?? (_a3.schema = inst);
   }
 }
@@ -18102,15 +18102,15 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     const syms = normalized.symbolKeys;
     const doc = new Doc(["payload", "ctx"], { shape, inst, memo: memo2, syms });
     const parseStr = (k) => `shape[${k}]._zod.run({ value: input[${k}], issues: [] }, ctx)`;
-    const prefixStr = (id2, k) => `
-          let ${id2}_ab = false;
-          for (let i = 0; i < ${id2}.issues.length; i++) {
-            const iss = ${id2}.issues[i];
+    const prefixStr = (id3, k) => `
+          let ${id3}_ab = false;
+          for (let i = 0; i < ${id3}.issues.length; i++) {
+            const iss = ${id3}.issues[i];
             iss.path = iss.path ? [${k}, ...iss.path] : [${k}];
             payload.issues.push(iss);
-            if (iss.continue !== true) ${id2}_ab = true;
+            if (iss.continue !== true) ${id3}_ab = true;
           }
-          if (${id2}_ab && ctx && ctx.abortEarly) {
+          if (${id3}_ab && ctx && ctx.abortEarly) {
             payload.value = newResult;
             return payload;
           }`;
@@ -18124,34 +18124,34 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     for (const key of normalized.allKeys) {
       if (key === "__proto__")
         continue;
-      const id2 = ids[key];
+      const id3 = ids[key];
       const k = typeof key === "symbol" ? `syms[${syms.indexOf(key)}]` : esc(key);
       const isPresent = `${k} in input`;
       const schema = shape[key];
       const optin = schema?._zod?.optin;
       const isOptionalIn = optin !== void 0;
       const isOptionalOut = schema?._zod?.optout === "optional";
-      doc.write(`const ${id2} = ${parseStr(k)};`);
+      doc.write(`const ${id3} = ${parseStr(k)};`);
       if (isOptionalIn && isOptionalOut) {
-        const assign = optin === "optional" ? `${id2}_present` : `${id2}.value !== undefined || ${id2}_present`;
+        const assign = optin === "optional" ? `${id3}_present` : `${id3}.value !== undefined || ${id3}_present`;
         doc.write(`
-        const ${id2}_present = ${isPresent};
-        if (!${id2}.issues.length || ${id2}_present) {
-          if (${id2}.issues.length) {${prefixStr(id2, k)}
+        const ${id3}_present = ${isPresent};
+        if (!${id3}.issues.length || ${id3}_present) {
+          if (${id3}.issues.length) {${prefixStr(id3, k)}
           }
 
           if (${assign}) {
-            newResult[${k}] = ${id2}.value;
+            newResult[${k}] = ${id3}.value;
           }
         }
 
       `);
       } else if (!isOptionalIn) {
         doc.write(`
-        const ${id2}_present = ${isPresent};
-        if (${id2}.issues.length) {${prefixStr(id2, k)}
+        const ${id3}_present = ${isPresent};
+        if (${id3}.issues.length) {${prefixStr(id3, k)}
         }
-        if (!${id2}_present && !${id2}.issues.length) {
+        if (!${id3}_present && !${id3}.issues.length) {
           payload.issues.push({
             code: "invalid_type",
             expected: "nonoptional",
@@ -18164,22 +18164,22 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
           }
         }
 
-        if (${id2}_present) {
-          newResult[${k}] = ${id2}.value;
+        if (${id3}_present) {
+          newResult[${k}] = ${id3}.value;
         }
 
       `);
       } else {
         doc.write(`
-        if (${id2}.issues.length) {${prefixStr(id2, k)}
+        if (${id3}.issues.length) {${prefixStr(id3, k)}
         }
       `);
         if (optin === "defaulted") {
-          doc.write(`newResult[${k}] = ${id2}.value;`);
+          doc.write(`newResult[${k}] = ${id3}.value;`);
         } else {
           doc.write(`
-        if (${id2}.value !== undefined || ${isPresent}) {
-          newResult[${k}] = ${id2}.value;
+        if (${id3}.value !== undefined || ${isPresent}) {
+          newResult[${k}] = ${id3}.value;
         }
       `);
         }
@@ -19549,7 +19549,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve2) {
+function isRecursive(inst, stack, resolve3) {
   const cached2 = recursive.get(inst);
   if (cached2 !== void 0)
     return cached2 ? PROVEN : NONE;
@@ -19559,7 +19559,7 @@ function isRecursive(inst, stack, resolve2) {
   let result2 = NONE;
   const check2 = (child) => {
     if (result2 !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve2);
+      const answer = isRecursive(child, stack, resolve3);
       if (answer > result2)
         result2 = answer;
     }
@@ -19570,7 +19570,7 @@ function isRecursive(inst, stack, resolve2) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve2) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve3) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -19634,7 +19634,7 @@ function isRecursive(inst, stack, resolve2) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve2 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve3 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -30197,26 +30197,26 @@ function extractDefs(ctx, schema) {
     return;
   const idToSchema = /* @__PURE__ */ new Map();
   for (const entry of ctx.seen.entries()) {
-    const id2 = ctx.metadataRegistry.get(entry[0])?.id;
-    if (id2) {
-      const existing = idToSchema.get(id2);
+    const id3 = ctx.metadataRegistry.get(entry[0])?.id;
+    if (id3) {
+      const existing = idToSchema.get(id3);
       if (existing && existing !== entry[0]) {
-        throw new Error(`Duplicate schema id "${id2}" detected during JSON Schema conversion. Two different schemas cannot share the same id when converted together.`);
+        throw new Error(`Duplicate schema id "${id3}" detected during JSON Schema conversion. Two different schemas cannot share the same id when converted together.`);
       }
-      idToSchema.set(id2, entry[0]);
+      idToSchema.set(id3, entry[0]);
     }
   }
   const makeURI = (entry) => {
     const defsSegment = ctx.target === "draft-2020-12" ? "$defs" : "definitions";
     if (ctx.external) {
       const externalId = ctx.external.registry.get(entry[0])?.id;
-      const uriGenerator = ctx.external.uri ?? ((id3) => id3);
+      const uriGenerator = ctx.external.uri ?? ((id4) => id4);
       if (externalId) {
         return { ref: uriGenerator(externalId) };
       }
-      const id2 = entry[1].defId ?? entry[1].schema.id ?? `schema${ctx.counter++}`;
-      entry[1].defId = id2;
-      return { defId: id2, ref: `${uriGenerator("__shared")}#/${defsSegment}/${encodeJSONPointerSegment(id2)}` };
+      const id3 = entry[1].defId ?? entry[1].schema.id ?? `schema${ctx.counter++}`;
+      entry[1].defId = id3;
+      return { defId: id3, ref: `${uriGenerator("__shared")}#/${defsSegment}/${encodeJSONPointerSegment(id3)}` };
     }
     const uriPrefix = `#`;
     const defUriPrefix = `${uriPrefix}/${defsSegment}/`;
@@ -30264,8 +30264,8 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
         continue;
       }
     }
-    const id2 = ctx.metadataRegistry.get(entry[0])?.id;
-    if (id2) {
+    const id3 = ctx.metadataRegistry.get(entry[0])?.id;
+    if (id3) {
       extractToDef(entry);
       continue;
     }
@@ -30498,10 +30498,10 @@ function finalize(ctx, schema) {
   } else {
   }
   if (ctx.external?.uri) {
-    const id2 = ctx.external.registry.get(schema)?.id;
-    if (!id2)
+    const id3 = ctx.external.registry.get(schema)?.id;
+    if (!id3)
       throw new Error("Schema is missing an `id` property");
-    result2.$id = ctx.external.uri(id2);
+    result2.$id = ctx.external.uri(id3);
   }
   assignProps(result2, root.defId ? root.schema : root.def ?? root.schema);
   const rootMetaId = ctx.metadataRegistry.get(schema)?.id;
@@ -30679,8 +30679,8 @@ var contributors = {
 function aggregateChecks(schema) {
   const agg = {};
   const def = schema._zod.def;
-  const list = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
-  for (const ch of list)
+  const list2 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
+  for (const ch of list2)
     contributors[ch._zod.def.check]?.(agg, ch._zod.def);
   const bag = schema._zod.bag;
   if (bag.minimum !== void 0)
@@ -31107,7 +31107,7 @@ function stringifyKeyNames(bySchema, json2, visited) {
   const values = json2.enum ?? (json2.const !== void 0 ? [json2.const] : void 0);
   if (!numericType && !values?.some((v) => typeof v === "number"))
     return json2;
-  const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format, id: id2, ...rest } = json2;
+  const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format, id: id3, ...rest } = json2;
   if (rest.enum)
     rest.enum = rest.enum.map((v) => typeof v === "number" ? String(v) : v);
   else if (typeof rest.const === "number")
@@ -37839,7 +37839,7 @@ var Protocol = class {
         }
         await this.notification(notification, notificationOptions);
       },
-      sendRequest: async (r, resultSchema, options) => {
+      sendRequest: async (r, resultSchema2, options) => {
         if (abortController.signal.aborted) {
           throw new McpError(ErrorCode.ConnectionClosed, "Request was cancelled");
         }
@@ -37851,7 +37851,7 @@ var Protocol = class {
         if (effectiveTaskId && taskStore) {
           await taskStore.updateTaskStatus(effectiveTaskId, "input_required");
         }
-        return await this.request(r, resultSchema, requestOptions);
+        return await this.request(r, resultSchema2, requestOptions);
       },
       authInfo: extra?.authInfo,
       requestId: request.id,
@@ -38015,11 +38015,11 @@ var Protocol = class {
    *
    * @experimental Use `client.experimental.tasks.requestStream()` to access this method.
    */
-  async *requestStream(request, resultSchema, options) {
+  async *requestStream(request, resultSchema2, options) {
     const { task } = options ?? {};
     if (!task) {
       try {
-        const result2 = await this.request(request, resultSchema, options);
+        const result2 = await this.request(request, resultSchema2, options);
         yield { type: "result", result: result2 };
       } catch (error62) {
         yield {
@@ -38043,7 +38043,7 @@ var Protocol = class {
         yield { type: "taskStatus", task: task2 };
         if (isTerminal(task2.status)) {
           if (task2.status === "completed") {
-            const result2 = await this.getTaskResult({ taskId }, resultSchema, options);
+            const result2 = await this.getTaskResult({ taskId }, resultSchema2, options);
             yield { type: "result", result: result2 };
           } else if (task2.status === "failed") {
             yield {
@@ -38059,12 +38059,12 @@ var Protocol = class {
           return;
         }
         if (task2.status === "input_required") {
-          const result2 = await this.getTaskResult({ taskId }, resultSchema, options);
+          const result2 = await this.getTaskResult({ taskId }, resultSchema2, options);
           yield { type: "result", result: result2 };
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+        await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error62) {
@@ -38079,11 +38079,11 @@ var Protocol = class {
    *
    * Do not use this method to emit notifications! Use notification() instead.
    */
-  request(request, resultSchema, options) {
+  request(request, resultSchema2, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject2) => {
       const earlyReject = (error62) => {
-        reject(error62);
+        reject2(error62);
       };
       if (!this._transport) {
         earlyReject(new Error("Not connected"));
@@ -38132,7 +38132,7 @@ var Protocol = class {
           }
         };
       }
-      const cancel = (reason) => {
+      const cancel2 = (reason) => {
         this._responseHandlers.delete(messageId);
         this._progressHandlers.delete(messageId);
         this._cleanupTimeout(messageId);
@@ -38145,31 +38145,31 @@ var Protocol = class {
           }
         }, { relatedRequestId, resumptionToken, onresumptiontoken }).catch((error63) => this._onerror(new Error(`Failed to send cancellation: ${error63}`)));
         const error62 = reason instanceof McpError ? reason : new McpError(ErrorCode.RequestTimeout, String(reason));
-        reject(error62);
+        reject2(error62);
       };
       this._responseHandlers.set(messageId, (response) => {
         if (options?.signal?.aborted) {
           return;
         }
         if (response instanceof Error) {
-          return reject(response);
+          return reject2(response);
         }
         try {
-          const parseResult = safeParse2(resultSchema, response.result);
+          const parseResult = safeParse2(resultSchema2, response.result);
           if (!parseResult.success) {
-            reject(parseResult.error);
+            reject2(parseResult.error);
           } else {
-            resolve2(parseResult.data);
+            resolve3(parseResult.data);
           }
         } catch (error62) {
-          reject(error62);
+          reject2(error62);
         }
       });
       options?.signal?.addEventListener("abort", () => {
-        cancel(options?.signal?.reason);
+        cancel2(options?.signal?.reason);
       });
       const timeout = options?.timeout ?? DEFAULT_REQUEST_TIMEOUT_MSEC;
-      const timeoutHandler = () => cancel(McpError.fromError(ErrorCode.RequestTimeout, "Request timed out", { timeout }));
+      const timeoutHandler = () => cancel2(McpError.fromError(ErrorCode.RequestTimeout, "Request timed out", { timeout }));
       this._setupTimeout(messageId, timeout, options?.maxTotalTimeout, timeoutHandler, options?.resetTimeoutOnProgress ?? false);
       const relatedTaskId = relatedTask?.taskId;
       if (relatedTaskId) {
@@ -38188,12 +38188,12 @@ var Protocol = class {
           timestamp: Date.now()
         }).catch((error62) => {
           this._cleanupTimeout(messageId);
-          reject(error62);
+          reject2(error62);
         });
       } else {
         this._transport.send(jsonrpcRequest, { relatedRequestId, resumptionToken, onresumptiontoken }).catch((error62) => {
           this._cleanupTimeout(messageId);
-          reject(error62);
+          reject2(error62);
         });
       }
     });
@@ -38211,8 +38211,8 @@ var Protocol = class {
    *
    * @experimental Use `client.experimental.tasks.getTaskResult()` to access this method.
    */
-  async getTaskResult(params, resultSchema, options) {
-    return this.request({ method: "tasks/result", params }, resultSchema, options);
+  async getTaskResult(params, resultSchema2, options) {
+    return this.request({ method: "tasks/result", params }, resultSchema2, options);
   }
   /**
    * Lists tasks, optionally starting from a pagination cursor.
@@ -38421,15 +38421,15 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject2) => {
       if (signal.aborted) {
-        reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
+        reject2(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve2, interval);
+      const timeoutId = setTimeout(resolve3, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
-        reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
+        reject2(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
       }, { once: true });
     });
   }
@@ -38606,8 +38606,8 @@ var ExperimentalServerTasks = class {
    *
    * @experimental
    */
-  requestStream(request, resultSchema, options) {
-    return this._server.requestStream(request, resultSchema, options);
+  requestStream(request, resultSchema2, options) {
+    return this._server.requestStream(request, resultSchema2, options);
   }
   /**
    * Sends a sampling request and returns an AsyncGenerator that yields response messages.
@@ -38675,7 +38675,7 @@ var ExperimentalServerTasks = class {
       if (hasPreviousToolUse) {
         const toolUseIds = new Set(previousContent.filter((c) => c.type === "tool_use").map((c) => c.id));
         const toolResultIds = new Set(lastContent.filter((c) => c.type === "tool_result").map((c) => c.toolUseId));
-        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id2) => toolResultIds.has(id2))) {
+        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id3) => toolResultIds.has(id3))) {
           throw new Error("ids of tool_result blocks and tool_use blocks from previous message do not match");
         }
       }
@@ -38772,8 +38772,8 @@ var ExperimentalServerTasks = class {
    *
    * @experimental
    */
-  async getTaskResult(taskId, resultSchema, options) {
-    return this._server.getTaskResult({ taskId }, resultSchema, options);
+  async getTaskResult(taskId, resultSchema2, options) {
+    return this._server.getTaskResult({ taskId }, resultSchema2, options);
   }
   /**
    * Lists tasks with optional pagination.
@@ -39100,7 +39100,7 @@ var Server = class extends Protocol {
       if (hasPreviousToolUse) {
         const toolUseIds = new Set(previousContent.filter((c) => c.type === "tool_use").map((c) => c.id));
         const toolResultIds = new Set(lastContent.filter((c) => c.type === "tool_result").map((c) => c.toolUseId));
-        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id2) => toolResultIds.has(id2))) {
+        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id3) => toolResultIds.has(id3))) {
           throw new Error("ids of tool_result blocks and tool_use blocks from previous message do not match");
         }
       }
@@ -39557,7 +39557,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+      await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -40221,12 +40221,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve2) => {
+    return new Promise((resolve3) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve2();
+        resolve3();
       } else {
-        this._stdout.once("drain", resolve2);
+        this._stdout.once("drain", resolve3);
       }
     });
   }
@@ -40245,17 +40245,14 @@ function G(B, Q, F, V, q) {
   return B.registerResource(Q, F, { mimeType: L, ...V }, q);
 }
 
-// src/domain.ts
-import { DatabaseSync } from "node:sqlite";
-
 // node_modules/i18next/dist/esm/i18next.js
 var isString = (obj) => typeof obj === "string";
 var defer = () => {
   let res;
   let rej;
-  const promise2 = new Promise((resolve2, reject) => {
-    res = resolve2;
-    rej = reject;
+  const promise2 = new Promise((resolve3, reject2) => {
+    res = resolve3;
+    rej = reject2;
   });
   promise2.resolve = res;
   promise2.reject = rej;
@@ -41523,9 +41520,9 @@ var Interpolator = class {
     let value;
     let clonedOptions;
     const handleHasOptions = (key, inheritedOptions) => {
-      const sep = this.nestingOptionsSeparator;
-      if (!key.includes(sep)) return key;
-      const c = key.split(new RegExp(`${regexEscape(sep)}[ ]*{`));
+      const sep2 = this.nestingOptionsSeparator;
+      if (!key.includes(sep2)) return key;
+      const c = key.split(new RegExp(`${regexEscape(sep2)}[ ]*{`));
       let optionsString = `{${c[1]}`;
       key = c[0];
       optionsString = this.interpolate(optionsString, clonedOptions);
@@ -41542,7 +41539,7 @@ var Interpolator = class {
         };
       } catch (e) {
         this.logger.warn(`failed parsing options string in nesting for key ${key}`, e);
-        return `${key}${sep}${optionsString}`;
+        return `${key}${sep2}${optionsString}`;
       }
       if (clonedOptions.defaultValue && clonedOptions.defaultValue.includes(this.prefix)) delete clonedOptions.defaultValue;
       return key;
@@ -42533,6 +42530,137 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default3 = {
+  "wiki.analysisModel": "Analysis model",
+  "wiki.reasoningEffort": "Reasoning effort",
+  "wiki.chooseModel": "Choose a model",
+  "wiki.chooseModelFirst": "Choose a model first",
+  "wiki.noReasoningEffort": "Not required",
+  "wiki.refreshModels": "Refresh models",
+  "wiki.modelChoiceHint": "Your last started selection is remembered. Existing candidates keep their recorded model for Wiki comparison; older candidates without model data use your current selection. Codex global settings are unchanged.",
+  "wiki.modelListFailed": "Could not load models: {{message}}",
+  "wiki.selectedModelUnavailable": "Your previous model or reasoning effort is unavailable. Refresh the list and choose again.",
+  "wiki.runningModel": "Running with: {{model}}",
+  "wiki.recordModel": "Extracted with: {{model}}",
+  "wiki.comparisonModel": "Wiki comparison: {{model}}",
+  "wiki.modelNotRecorded": "Not recorded for this older candidate",
+  "wiki.scopeHint": "Session content, selected Wiki and human-facing pages, and Vault category information are sent to your configured Codex model. New topics produce Wiki and human-facing notes. Duplicate checks cover the compared pages only.",
+  "wiki.sources": "Compared pages",
+  "wiki.agentPath": "Wiki: {{path}}",
+  "wiki.vaultPath": "Vault human-facing note: {{path}}",
+  "wiki.recordChanged": "The candidate changed. Return to the workspace and preview it again.",
+  "wiki.recordMissing": "The requested candidate is unavailable. Return to the workspace and select it again.",
+  "wiki.localApprovalHint": "For human-only approval, review and confirm the final write in the local browser page.",
+  "wiki.localApprovalOpened": "The local review page was requested. If it did not open, visit:",
+  "wiki.openApproval": "Open local approval",
+  "wiki.capturePreparing": "Preparing the experience conversation and source\u2026",
+  "wiki.captureQueued": "Preparing in the background. You can keep working; we will notify you when it is ready.",
+  "wiki.captureInBackground": "Preparing in background",
+  "wiki.captureBackgroundHint": "Keep working. A notice will appear when the conversation is ready.",
+  "wiki.capturePreparationFailed": "Preparation incomplete",
+  "wiki.captureCheckNeeded": "Check creation result",
+  "wiki.retryCapture": "Retry preparation",
+  "wiki.enterCapture": "Open experience conversation",
+  "wiki.captureReadyTitle": "Experience conversation is ready",
+  "wiki.captureReadyDescription": "Source material and instructions are ready. Open the conversation, choose a model and send the prepared prompt to begin.",
+  "wiki.captureLater": "Later",
+  "wiki.capturePreparationStage.reading": "Reading source material",
+  "wiki.capturePreparationStage.connecting": "Connecting to Codex",
+  "wiki.capturePreparationStage.creating": "Creating conversation",
+  "wiki.capturePreparationStage.seeding": "Preparing handoff prompt",
+  "wiki.capturePreparationStage.ready": "Ready",
+  "wiki.captureContinued": "Opened the existing Codex experience conversation.",
+  "wiki.captureOpened": "Opened the Codex experience conversation. Choose a model and send the prepared prompt there.",
+  "wiki.continueCapture": "Continue experience",
+  "wiki.captureProgressHint": "Runtime comes from Codex; stages and ingest results are reported by the conversation",
+  "wiki.captureStatus.ready": "Experience conversation ready",
+  "wiki.captureStatus.running": "Preparing experience",
+  "wiki.captureStatus.waiting": "Experience needs your input",
+  "wiki.captureStatus.paused": "Experience turn ended",
+  "wiki.captureStatus.interrupted": "Experience interrupted",
+  "wiki.captureStatus.failed": "Experience failed",
+  "wiki.captureStatus.unknown": "Experience status unavailable",
+  "wiki.captureStatus.reported_complete": "Conversation reports ingested",
+  "wiki.captureStatus.no_knowledge": "No durable knowledge found",
+  "wiki.captureStage.ready": "Prompt ready",
+  "wiki.captureStage.completed": "Completion reported",
+  "wiki.captureStage.no_knowledge": "No durable knowledge",
+  "wiki.captureStage.failed": "Failure reported",
+  "wiki.captureStage.reading": "Reading source",
+  "wiki.captureStage.reviewing": "Reviewing experience",
+  "wiki.captureStage.planning": "Preparing ingest",
+  "wiki.captureStage.awaiting_approval": "Awaiting write approval",
+  "wiki.captureStage.writing": "Writing Wiki",
+  "wiki.captureStage.checking": "Checking ingest",
+  "wiki.title": "Capture experience",
+  "wiki.description": "Review findings, related Wiki pages, and every proposed change before approval.",
+  "wiki.localHint": "Findings and review notes are stored locally.",
+  "wiki.loading": "Loading review history\u2026",
+  "wiki.processing": "Processing\u2026",
+  "wiki.extract": "Extract experience",
+  "wiki.agentProgress": "Codex is preparing experience. Read {{completed}} / {{total}} source pages; conclusions still need verification. You can close this window and return later.",
+  "wiki.agentFailed": "Analysis incomplete: {{message}}. Read {{completed}} / {{total}} pages. Retry checks the snapshot before resuming the background conversation.",
+  "wiki.agentCoverageNotice": "Read all {{total}} source pages and created candidates. Reading coverage does not establish correctness. Review each item; non-text content may not be understood.",
+  "wiki.agentDetails": "Background analysis task",
+  "wiki.agentIsolationHint": "This conversation is hidden from ordinary session lists and execution boards. Official Wiki writes still require your final approval.",
+  "wiki.agentThread": "Codex conversation:",
+  "wiki.agentActivity": "Last activity: {{time}} \xB7 {{calls}} tool calls \xB7 {{compactions}} native compactions \xB7 attempt {{attempt}}",
+  "wiki.agentSnapshot": "Source snapshot:",
+  "wiki.progress": "Reading the session and identifying experiences. You can close this window and return later.",
+  "wiki.chunkProgress": "Analyzing chunks: {{completed}} / {{total}} complete. You can close this window and return later.",
+  "wiki.mergeProgress": "Combining chunks and checking later corrections. You can close this window and return later.",
+  "wiki.curateProgress": "Selecting durable knowledge for this task, combining related findings and removing routine activity and generic advice.",
+  "wiki.verifyProgress": "Checking original evidence. Model checks are only aids for human review.",
+  "wiki.legacyAnalysisFailed": "The previous chunk-based job did not finish: {{message}}. Retry uses a native Codex background conversation; old chunk results are kept separate.",
+  "wiki.analysisFailed": "Analysis incomplete ({{completed}} / {{total}} chunks): {{message}}. Retrying checks the source and resumes completed chunks.",
+  "wiki.retryAnalysis": "Retry analysis",
+  "wiki.cancelComparison": "Cancel Wiki comparison",
+  "wiki.cancelAnalysis": "Cancel analysis",
+  "wiki.connectionOutdated": "This plugin connection is still using an older version. Reconnect it to use the new flow here, or continue in the local workspace.",
+  "wiki.continueInBrowser": "Continue in local workspace",
+  "wiki.analysisCompleteHistory": "The new analysis was saved. Select it from history to review it.",
+  "wiki.coverageNotice": "Processed {{total}} / {{total}} source chunks. The model may miss experience or not understand non-text content such as images; review against the original session.",
+  "wiki.history": "History",
+  "wiki.workspaceTitle": "Experience review",
+  "wiki.edit": "Edit",
+  "wiki.doneEditing": "Done editing",
+  "wiki.emptyValue": "No content",
+  "wiki.proposedHeading": "Proposed changes",
+  "wiki.stagedHint": "Review each experience and save before checking Wiki duplicates and conflicts. Writing still requires a preview and human approval.",
+  "wiki.sessionStep": "Session overview",
+  "wiki.compareStep": "Wiki comparison",
+  "wiki.writeStep": "Preview and write",
+  "wiki.experienceItems": "Review each experience",
+  "wiki.noExperiences": "No reusable experience was identified in this session.",
+  "wiki.itemNote": "My feedback",
+  "wiki.decision.pending": "Pending",
+  "wiki.decision.confirmed": "Confirmed",
+  "wiki.decision.excluded": "Excluded",
+  "wiki.action.confirmed": "Confirm",
+  "wiki.action.excluded": "Exclude",
+  "wiki.startCompare": "Check Wiki duplicates and conflicts",
+  "wiki.saveDecisionsHint": "Confirm or exclude each item, add feedback, then save before comparing with the Wiki.",
+  "wiki.legacyNotice": "This older record already includes a Wiki comparison. Extract again to use the new item-by-item review flow.",
+  "wiki.empty": "No analysis yet. Select \u201CExtract experience\u201D to begin.",
+  "wiki.noChanges": "No proposed changes",
+  "wiki.summary": "Conclusion",
+  "wiki.scope": "Applicability",
+  "wiki.evidence": "Evidence (including session items)",
+  "wiki.unverified": "Unverified",
+  "wiki.relation": "Similar Wiki content and potential conflicts",
+  "wiki.reviewNote": "My review notes",
+  "wiki.proposedContent": "Proposed full content: {{path}}",
+  "wiki.previewHint": "Review every file. Changes to the candidate or Wiki require a fresh preview. Avoid simultaneous edits from other programs while approving.",
+  "wiki.back": "Back to review",
+  "wiki.approve": "Approve and write to Wiki",
+  "wiki.reject": "Reject",
+  "wiki.save": "Save edits",
+  "wiki.preview": "Preview changes",
+  "wiki.status.pending": "Pending review",
+  "wiki.status.rejected": "Rejected",
+  "wiki.status.written": "Written",
+  "workspace.lastObservedAt": "Status last observed: {{at}}",
+  "runtime.lastObservedApproval": "Last observed: awaiting authorization",
+  "runtime.lastObservedInput": "Last observed: awaiting user input",
   "runtime.lastObservedRunning": "Last observed: running",
   "session.historicalCompleted": "Completed (historical)",
   "board.pending": "Needs confirmation",
@@ -43019,6 +43147,50 @@ var en_default3 = {
   "review.actualRevision": " \xB7 Actually reviewed r{{revision}}",
   "delete.title": "Confirm deletion",
   "delete.hint": "Only unexecuted data without references or time records can be deleted. Cancel tasks with execution records.",
+  "session.summaryGenerate": "Generate summary",
+  "session.summaryQueued": "Summary queued",
+  "session.summaryPending": "Summary not yet generated",
+  "session.summaryGenerating": "Generating session summary\u2026",
+  "session.summaryFailed": "Summary generation failed; will retry later",
+  "session.summaryPartial": "Generated from part of the session",
+  "session.summaryOutdated": "Session updated; summary pending refresh",
+  "batch.groupProjects": "Group by project",
+  "batch.completeAll": "Complete sessions",
+  "batch.pendingRange": "Pending date range",
+  "batch.completedRange": "Completed date range",
+  "batch.lastDays": "Last {{count}} days",
+  "batch.lastTwoDays": "Last 2 days",
+  "batch.lastSevenDays": "Last 7 days",
+  "batch.allTime": "All time",
+  "batch.custom": "Custom",
+  "batch.invalidRange": "Start date must not be after end date",
+  "batch.startDate": "Start date",
+  "batch.endDate": "End date",
+  "batch.unknownCreated": "Creation time unknown",
+  "batch.created": "Created",
+  "batch.taskNotAccepted": "Session archived; task not accepted",
+  "batch.completeProject": "Complete pending",
+  "batch.interrupted": "Interrupted or failed",
+  "batch.title": "Confirm session completion",
+  "batch.description": "Move selected sessions to Completed. This does not stop running sessions or accept linked tasks.",
+  "batch.selected": "Selected {{count}} of {{total}} sessions",
+  "batch.runningWarning": "Completing a running session does not stop it; new activity will reopen it.",
+  "batch.confirm": "Confirm ({{count}})",
+  "batch.success": "Completed {{count}} sessions",
+  "batch.result": "{{succeeded}} completed, {{failed}} incomplete",
+  "batch.selectAll": "Select all",
+  "batch.deselectAll": "Clear selection",
+  "batch.statusSelection": "Select by session status",
+  "batch.refreshState": "Refresh status",
+  "batch.unknownFailure": "The action did not complete. Refresh the status and retry.",
+  "batch.processing": "Processing",
+  "batch.empty": "No sessions need action in this selection.",
+  "batch.footerHint": "New activity will reopen the session",
+  "batch.archive": "Archive",
+  "settings.sessionAge": "Session visibility",
+  "settings.sessionAgeDays": "Days since last update",
+  "settings.sessionAgeHint": "Enter 0 for no limit. Older sessions are hidden, not deleted. Sessions with unknown activity dates remain visible.",
+  "settings.sessionAgeSaved": "Session visibility saved",
   "settings.language": "Language",
   "settings.followSystem": "Follow system",
   "settings.languageHint": "Automatic mode follows the Codex host language, then the browser language.",
@@ -43153,6 +43325,137 @@ var en_default3 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "wiki.analysisModel": "\u5206\u6790\u6A21\u578B",
+  "wiki.reasoningEffort": "\u63A8\u7406\u5F3A\u5EA6",
+  "wiki.chooseModel": "\u8BF7\u9009\u62E9\u6A21\u578B",
+  "wiki.chooseModelFirst": "\u5148\u9009\u62E9\u6A21\u578B",
+  "wiki.noReasoningEffort": "\u8BE5\u6A21\u578B\u65E0\u9700\u8BBE\u7F6E",
+  "wiki.refreshModels": "\u5237\u65B0\u5217\u8868",
+  "wiki.modelChoiceHint": "\u4F1A\u8BB0\u4F4F\u4E0A\u6B21\u542F\u52A8\u65F6\u7684\u9009\u62E9\u3002\u5DF2\u6709\u8BB0\u5F55\u7684 Wiki \u5BF9\u7167\u6CBF\u7528\u8BB0\u5F55\u4E2D\u7684\u6A21\u578B\uFF1B\u65E7\u8BB0\u5F55\u672A\u4FDD\u5B58\u6A21\u578B\u65F6\u4F7F\u7528\u5F53\u524D\u9009\u62E9\u3002\u4E0D\u4FEE\u6539 Codex \u5168\u5C40\u8BBE\u7F6E\u3002",
+  "wiki.modelListFailed": "\u6A21\u578B\u5217\u8868\u8BFB\u53D6\u5931\u8D25\uFF1A{{message}}",
+  "wiki.selectedModelUnavailable": "\u4E0A\u6B21\u9009\u62E9\u7684\u6A21\u578B\u6216\u63A8\u7406\u5F3A\u5EA6\u5F53\u524D\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5237\u65B0\u5217\u8868\u5E76\u91CD\u65B0\u9009\u62E9\u3002",
+  "wiki.runningModel": "\u672C\u6B21\u5206\u6790\uFF1A{{model}}",
+  "wiki.recordModel": "\u63D0\u53D6\u4F7F\u7528\uFF1A{{model}}",
+  "wiki.comparisonModel": "Wiki \u5BF9\u7167\u4F7F\u7528\uFF1A{{model}}",
+  "wiki.modelNotRecorded": "\u65E7\u8BB0\u5F55\u672A\u4FDD\u5B58\u6A21\u578B\u4FE1\u606F",
+  "wiki.scopeHint": "\u4F1A\u8BDD\u5185\u5BB9\u3001\u9009\u4E2D\u7684 Wiki \u4E0E\u4EBA\u8BFB\u7248\u9875\u9762\u4EE5\u53CA Vault \u5206\u7C7B\u4FE1\u606F\u4F1A\u53D1\u9001\u7ED9\u672C\u6B21\u9009\u5B9A\u7684 Codex \u6A21\u578B\uFF1B\u65B0\u4E3B\u9898\u4F1A\u540C\u65F6\u751F\u6210 Wiki \u7248\u4E0E\u4EBA\u8BFB\u7248\u3002\u67E5\u91CD\u8303\u56F4\u4EE5\u5BF9\u7167\u9875\u9762\u4E3A\u51C6\u3002",
+  "wiki.sources": "\u5DF2\u5BF9\u7167\u9875\u9762",
+  "wiki.agentPath": "Wiki\uFF1A{{path}}",
+  "wiki.vaultPath": "Vault \u4EBA\u8BFB\u7248\uFF1A{{path}}",
+  "wiki.recordChanged": "\u5BA1\u6838\u5019\u9009\u5DF2\u66F4\u65B0\uFF0C\u8BF7\u8FD4\u56DE\u5DE5\u4F5C\u53F0\u91CD\u65B0\u9884\u89C8\u3002",
+  "wiki.recordMissing": "\u539F\u5BA1\u6838\u5019\u9009\u4E0D\u5B58\u5728\uFF0C\u8BF7\u8FD4\u56DE\u5DE5\u4F5C\u53F0\u91CD\u65B0\u9009\u62E9\u3002",
+  "wiki.localApprovalHint": "\u4E3A\u786E\u4FDD\u53EA\u80FD\u7531\u4F60\u6279\u51C6\uFF0C\u6700\u7EC8\u5199\u5165\u9700\u5728\u672C\u5730\u6D4F\u89C8\u5668\u9875\u9762\u518D\u6B21\u9884\u89C8\u5E76\u786E\u8BA4\u3002",
+  "wiki.localApprovalOpened": "\u5DF2\u8BF7\u6C42\u6253\u5F00\u672C\u5730\u5BA1\u6838\u9875\u9762\uFF1B\u5982\u672A\u663E\u793A\uFF0C\u8BF7\u624B\u52A8\u8BBF\u95EE\uFF1A",
+  "wiki.openApproval": "\u6253\u5F00\u672C\u5730\u9875\u9762\u6279\u51C6",
+  "wiki.capturePreparing": "\u6B63\u5728\u51C6\u5907\u6C89\u6DC0\u4F1A\u8BDD\u4E0E\u539F\u6587\u8D44\u6599\u2026",
+  "wiki.captureQueued": "\u5DF2\u5728\u540E\u53F0\u51C6\u5907\uFF0C\u5B8C\u6210\u540E\u4F1A\u63D0\u9192\u4F60\uFF0C\u53EF\u7EE7\u7EED\u5904\u7406\u5176\u4ED6\u5DE5\u4F5C\u3002",
+  "wiki.captureInBackground": "\u540E\u53F0\u51C6\u5907\u4E2D",
+  "wiki.captureBackgroundHint": "\u53EF\u7EE7\u7EED\u5904\u7406\u5176\u4ED6\u5DE5\u4F5C\uFF0C\u51C6\u5907\u5B8C\u6210\u540E\u4F1A\u5F39\u7A97\u63D0\u9192\u3002",
+  "wiki.capturePreparationFailed": "\u6C89\u6DC0\u51C6\u5907\u672A\u5B8C\u6210",
+  "wiki.captureCheckNeeded": "\u521B\u5EFA\u7ED3\u679C\u5F85\u6838\u5BF9",
+  "wiki.retryCapture": "\u91CD\u8BD5\u51C6\u5907",
+  "wiki.enterCapture": "\u8FDB\u5165\u6C89\u6DC0\u4F1A\u8BDD",
+  "wiki.captureReadyTitle": "\u6C89\u6DC0\u4F1A\u8BDD\u5DF2\u5C31\u7EEA",
+  "wiki.captureReadyDescription": "\u539F\u6587\u8D44\u6599\u548C\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907\u597D\u3002\u8FDB\u5165\u4F1A\u8BDD\u540E\u9009\u62E9\u6A21\u578B\u5E76\u53D1\u9001\uFF0C\u5373\u53EF\u5F00\u59CB\u6C89\u6DC0\u3002",
+  "wiki.captureLater": "\u7A0D\u540E",
+  "wiki.capturePreparationStage.reading": "\u8BFB\u53D6\u539F\u6587\u8D44\u6599",
+  "wiki.capturePreparationStage.connecting": "\u8FDE\u63A5 Codex",
+  "wiki.capturePreparationStage.creating": "\u521B\u5EFA\u6C89\u6DC0\u4F1A\u8BDD",
+  "wiki.capturePreparationStage.seeding": "\u51C6\u5907\u4EA4\u63A5\u63D0\u793A\u8BCD",
+  "wiki.capturePreparationStage.ready": "\u51C6\u5907\u5C31\u7EEA",
+  "wiki.captureContinued": "\u5DF2\u6253\u5F00\u539F\u6765\u7684 Codex \u6C89\u6DC0\u4F1A\u8BDD\u3002",
+  "wiki.captureOpened": "\u5DF2\u6253\u5F00 Codex \u6C89\u6DC0\u4F1A\u8BDD\uFF1B\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u9009\u62E9\u6A21\u578B\u5E76\u53D1\u9001\u3002",
+  "wiki.continueCapture": "\u7EE7\u7EED\u6C89\u6DC0",
+  "wiki.captureProgressHint": "\u8FD0\u884C\u72B6\u6001\u6765\u81EA Codex\uFF1B\u5177\u4F53\u9636\u6BB5\u548C\u5165\u5E93\u7ED3\u679C\u7531\u6C89\u6DC0\u4F1A\u8BDD\u56DE\u62A5",
+  "wiki.captureStatus.ready": "\u6C89\u6DC0\u4F1A\u8BDD\u5DF2\u5C31\u7EEA",
+  "wiki.captureStatus.running": "\u6B63\u5728\u6C89\u6DC0",
+  "wiki.captureStatus.waiting": "\u6C89\u6DC0\u5F85\u4F60\u786E\u8BA4",
+  "wiki.captureStatus.paused": "\u6C89\u6DC0\u4F1A\u8BDD\u672C\u8F6E\u7ED3\u675F",
+  "wiki.captureStatus.interrupted": "\u6C89\u6DC0\u5DF2\u4E2D\u65AD",
+  "wiki.captureStatus.failed": "\u6C89\u6DC0\u5F02\u5E38",
+  "wiki.captureStatus.unknown": "\u6C89\u6DC0\u72B6\u6001\u5F85\u540C\u6B65",
+  "wiki.captureStatus.reported_complete": "\u4F1A\u8BDD\u62A5\u544A\u5DF2\u5165\u5E93",
+  "wiki.captureStatus.no_knowledge": "\u672C\u6B21\u65E0\u53EF\u6C89\u6DC0\u7ECF\u9A8C",
+  "wiki.captureStage.ready": "\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907",
+  "wiki.captureStage.completed": "\u5165\u5E93\u5B8C\u6210\u56DE\u62A5",
+  "wiki.captureStage.no_knowledge": "\u65E0\u53EF\u6C89\u6DC0\u5185\u5BB9",
+  "wiki.captureStage.failed": "\u5F02\u5E38\u56DE\u62A5",
+  "wiki.captureStage.reading": "\u8BFB\u53D6\u539F\u4F1A\u8BDD",
+  "wiki.captureStage.reviewing": "\u786E\u8BA4\u7ECF\u9A8C",
+  "wiki.captureStage.planning": "\u51C6\u5907 ingest",
+  "wiki.captureStage.awaiting_approval": "\u7B49\u5F85\u5199\u5165\u6279\u51C6",
+  "wiki.captureStage.writing": "\u5199\u5165 Wiki",
+  "wiki.captureStage.checking": "\u68C0\u67E5\u5165\u5E93\u7ED3\u679C",
+  "wiki.title": "\u6C89\u6DC0\u7ECF\u9A8C",
+  "wiki.description": "\u6838\u5BF9\u7ED3\u8BBA\u3001Wiki \u5BF9\u7167\u548C\u62DF\u4FEE\u6539\u5185\u5BB9\uFF1B\u53EA\u6709\u4EBA\u5DE5\u6279\u51C6\u540E\u624D\u5199\u5165\u3002",
+  "wiki.localHint": "\u5206\u6790\u7ED3\u8BBA\u548C\u5BA1\u6838\u610F\u89C1\u4FDD\u5B58\u5728\u672C\u673A\u3002",
+  "wiki.loading": "\u6B63\u5728\u8BFB\u53D6\u5BA1\u6838\u8BB0\u5F55\u2026",
+  "wiki.processing": "\u5904\u7406\u4E2D\u2026",
+  "wiki.extract": "\u63D0\u53D6\u7ECF\u9A8C",
+  "wiki.agentProgress": "Codex \u6B63\u5728\u6574\u7406\u7ECF\u9A8C\uFF0C\u5DF2\u8BFB\u53D6 {{completed}} / {{total}} \u9875\u539F\u6587\u3002\u8BFB\u53D6\u5B8C\u6210\u540E\u4ECD\u9700\u6838\u5B9E\u548C\u5F62\u6210\u7ED3\u8BBA\uFF0C\u53EF\u4EE5\u5173\u95ED\u7A97\u53E3\u7A0D\u540E\u56DE\u6765\u3002",
+  "wiki.agentFailed": "\u672C\u6B21\u6574\u7406\u672A\u5B8C\u6210\uFF1A{{message}}\u3002\u5DF2\u8BFB {{completed}} / {{total}} \u9875\uFF1B\u91CD\u8BD5\u4F1A\u5148\u6838\u5BF9\u539F\u6587\u5FEB\u7167\uFF0C\u518D\u6062\u590D\u5BF9\u5E94\u540E\u53F0\u4F1A\u8BDD\u3002",
+  "wiki.agentCoverageNotice": "\u5DF2\u8BFB\u53D6\u5168\u90E8 {{total}} \u9875\u539F\u6587\u5E76\u751F\u6210\u5019\u9009\u3002\u8BFB\u53D6\u8986\u76D6\u4E0D\u7B49\u4E8E\u7ED3\u8BBA\u6B63\u786E\uFF1B\u8BF7\u9010\u9879\u6838\u5BF9\uFF0C\u56FE\u7247\u7B49\u975E\u6587\u672C\u5185\u5BB9\u53EF\u80FD\u65E0\u6CD5\u7406\u89E3\u3002",
+  "wiki.agentDetails": "\u540E\u53F0\u6574\u7406\u4EFB\u52A1",
+  "wiki.agentIsolationHint": "\u6B64\u4F1A\u8BDD\u53EA\u7528\u4E8E\u6574\u7406\u7ECF\u9A8C\uFF0C\u4E0D\u51FA\u73B0\u5728\u666E\u901A\u4F1A\u8BDD\u5217\u8868\u6216\u6267\u884C\u770B\u677F\u4E2D\u3002\u6B63\u5F0F Wiki \u4ECD\u9700\u6700\u7EC8\u4EBA\u5DE5\u6279\u51C6\u3002",
+  "wiki.agentThread": "\u5173\u8054 Codex \u4F1A\u8BDD\uFF1A",
+  "wiki.agentActivity": "\u6700\u8FD1\u6D3B\u52A8\uFF1A{{time}} \xB7 \u5DE5\u5177\u8BFB\u53D6 {{calls}} \u6B21 \xB7 \u539F\u751F\u538B\u7F29 {{compactions}} \u6B21 \xB7 \u7B2C {{attempt}} \u6B21\u6267\u884C",
+  "wiki.agentSnapshot": "\u6765\u6E90\u5FEB\u7167\uFF1A",
+  "wiki.progress": "\u6B63\u5728\u8BFB\u53D6\u4F1A\u8BDD\u5E76\u6574\u7406\u7ECF\u9A8C\u3002\u53EF\u4EE5\u5173\u95ED\u6B64\u7A97\u53E3\uFF0C\u5B8C\u6210\u540E\u518D\u6253\u5F00\u67E5\u770B\u3002",
+  "wiki.chunkProgress": "\u6B63\u5728\u5206\u6BB5\u5206\u6790\uFF1A\u5DF2\u5B8C\u6210 {{completed}} / {{total}} \u6BB5\u3002\u53EF\u4EE5\u5173\u95ED\u6B64\u7A97\u53E3\uFF0C\u7A0D\u540E\u56DE\u6765\u67E5\u770B\u3002",
+  "wiki.mergeProgress": "\u6B63\u5728\u5408\u5E76\u5404\u6BB5\u7ED3\u679C\u5E76\u68C0\u67E5\u524D\u540E\u4FEE\u6B63\u3002\u53EF\u4EE5\u5173\u95ED\u6B64\u7A97\u53E3\uFF0C\u7A0D\u540E\u56DE\u6765\u67E5\u770B\u3002",
+  "wiki.curateProgress": "\u6B63\u5728\u6309\u4F1A\u8BDD\u76EE\u6807\u7B5B\u9009\u957F\u671F\u77E5\u8BC6\uFF0C\u5408\u5E76\u540C\u7C7B\u53D1\u73B0\u5E76\u6392\u9664\u64CD\u4F5C\u6D41\u6C34\u548C\u6CDB\u6CDB\u5EFA\u8BAE\u3002",
+  "wiki.verifyProgress": "\u6B63\u5728\u56DE\u67E5\u539F\u59CB\u4F9D\u636E\u3002\u6A21\u578B\u56DE\u67E5\u4EC5\u4F9B\u4EBA\u5DE5\u5BA1\u6838\u53C2\u8003\u3002",
+  "wiki.legacyAnalysisFailed": "\u65E7\u7248\u5206\u6BB5\u4EFB\u52A1\u672A\u5B8C\u6210\uFF1A{{message}}\u3002\u91CD\u8BD5\u5C06\u4F7F\u7528\u539F\u751F Codex \u540E\u53F0\u4F1A\u8BDD\uFF0C\u65E7\u5206\u6BB5\u4E0D\u4F1A\u6DF7\u5165\u65B0\u5206\u6790\u3002",
+  "wiki.analysisFailed": "\u5206\u6790\u672A\u5B8C\u6210\uFF08{{completed}} / {{total}} \u6BB5\uFF09\uFF1A{{message}}\u3002\u91CD\u8BD5\u65F6\u5C06\u6838\u5BF9\u539F\u4F1A\u8BDD\uFF0C\u5E76\u6062\u590D\u5DF2\u5B8C\u6210\u7684\u5206\u6BB5\u3002",
+  "wiki.retryAnalysis": "\u91CD\u8BD5\u5206\u6790",
+  "wiki.cancelComparison": "\u53D6\u6D88 Wiki \u5BF9\u7167",
+  "wiki.cancelAnalysis": "\u53D6\u6D88\u5206\u6790",
+  "wiki.connectionOutdated": "\u5F53\u524D\u63D2\u4EF6\u8FDE\u63A5\u4ECD\u662F\u65E7\u7248\u672C\uFF0C\u91CD\u65B0\u8FDE\u63A5\u63D2\u4EF6\u540E\u53EF\u5728\u6B64\u4F7F\u7528\u65B0\u6D41\u7A0B\u3002\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u672C\u5730\u5DE5\u4F5C\u53F0\u7EE7\u7EED\u3002",
+  "wiki.continueInBrowser": "\u5728\u672C\u5730\u5DE5\u4F5C\u53F0\u7EE7\u7EED",
+  "wiki.analysisCompleteHistory": "\u65B0\u7684\u5206\u6790\u5DF2\u5B8C\u6210\u5E76\u4FDD\u5B58\uFF0C\u53EF\u5728\u5386\u53F2\u8BB0\u5F55\u4E2D\u5207\u6362\u67E5\u770B\u3002",
+  "wiki.coverageNotice": "\u5DF2\u5904\u7406 {{total}} / {{total}} \u4E2A\u8BFB\u53D6\u5206\u6BB5\u3002\u6A21\u578B\u53EF\u80FD\u9057\u6F0F\u7ECF\u9A8C\u6216\u65E0\u6CD5\u7406\u89E3\u56FE\u7247\u7B49\u975E\u6587\u672C\u5185\u5BB9\uFF0C\u8BF7\u7ED3\u5408\u539F\u4F1A\u8BDD\u5BA1\u6838\u3002",
+  "wiki.history": "\u5386\u53F2\u8BB0\u5F55",
+  "wiki.workspaceTitle": "\u7ECF\u9A8C\u5BA1\u6838\u5DE5\u4F5C\u53F0",
+  "wiki.edit": "\u7F16\u8F91",
+  "wiki.doneEditing": "\u5B8C\u6210\u7F16\u8F91",
+  "wiki.emptyValue": "\u6682\u65E0\u5185\u5BB9",
+  "wiki.proposedHeading": "\u62DF\u5199\u5165\u5185\u5BB9",
+  "wiki.stagedHint": "\u5148\u9010\u9879\u5BA1\u6838\u7ECF\u9A8C\u5E76\u4FDD\u5B58\uFF0C\u518D\u68C0\u67E5 Wiki \u4E2D\u7684\u76F8\u4F3C\u5185\u5BB9\u548C\u51B2\u7A81\u3002\u6700\u7EC8\u5199\u5165\u4ECD\u9700\u9884\u89C8\u5E76\u4EBA\u5DE5\u6279\u51C6\u3002",
+  "wiki.sessionStep": "\u4F1A\u8BDD\u505A\u4E86\u4EC0\u4E48",
+  "wiki.compareStep": "Wiki \u5BF9\u7167",
+  "wiki.writeStep": "\u9884\u89C8\u4E0E\u5199\u5165",
+  "wiki.experienceItems": "\u9010\u9879\u786E\u8BA4\u7ECF\u9A8C",
+  "wiki.noExperiences": "\u672C\u6B21\u4F1A\u8BDD\u672A\u53D1\u73B0\u503C\u5F97\u6C89\u6DC0\u7684\u7ECF\u9A8C\u3002",
+  "wiki.itemNote": "\u6211\u7684\u610F\u89C1",
+  "wiki.decision.pending": "\u5F85\u786E\u8BA4",
+  "wiki.decision.confirmed": "\u5DF2\u786E\u8BA4",
+  "wiki.decision.excluded": "\u4E0D\u6C89\u6DC0",
+  "wiki.action.confirmed": "\u786E\u8BA4\u8FD9\u6761",
+  "wiki.action.excluded": "\u4E0D\u6C89\u6DC0\u8FD9\u6761",
+  "wiki.startCompare": "\u68C0\u67E5 Wiki \u91CD\u590D\u4E0E\u51B2\u7A81",
+  "wiki.saveDecisionsHint": "\u8BF7\u9010\u6761\u9009\u62E9\u786E\u8BA4\u6216\u4E0D\u6C89\u6DC0\uFF0C\u586B\u5199\u610F\u89C1\u540E\u70B9\u51FB\u201C\u4FDD\u5B58\u4FEE\u6539\u201D\uFF0C\u518D\u5F00\u59CB Wiki \u5BF9\u7167\u3002",
+  "wiki.legacyNotice": "\u8FD9\u662F\u65E7\u6D41\u7A0B\u751F\u6210\u7684\u8BB0\u5F55\uFF0C\u5DF2\u5305\u542B Wiki \u5BF9\u7167\u3002\u70B9\u51FB\u201C\u63D0\u53D6\u7ECF\u9A8C\u201D\u53EF\u6309\u65B0\u7684\u9010\u9879\u786E\u8BA4\u6D41\u7A0B\u91CD\u65B0\u5206\u6790\u3002",
+  "wiki.empty": "\u6682\u65E0\u5206\u6790\u8BB0\u5F55\uFF0C\u70B9\u51FB\u201C\u63D0\u53D6\u7ECF\u9A8C\u201D\u5F00\u59CB\u3002",
+  "wiki.noChanges": "\u6CA1\u6709\u62DF\u5199\u5165\u5185\u5BB9",
+  "wiki.summary": "\u7ED3\u8BBA",
+  "wiki.scope": "\u9002\u7528\u8303\u56F4",
+  "wiki.evidence": "\u4F9D\u636E\uFF08\u542B\u4F1A\u8BDD\u6761\u76EE\uFF09",
+  "wiki.unverified": "\u672A\u9A8C\u8BC1\u4E8B\u9879",
+  "wiki.relation": "Wiki \u76F8\u4F3C\u4E0E\u51B2\u7A81\u5206\u6790",
+  "wiki.reviewNote": "\u6211\u7684\u5BA1\u6838\u610F\u89C1",
+  "wiki.proposedContent": "\u62DF\u4FEE\u6539\u5168\u6587\uFF1A{{path}}",
+  "wiki.previewHint": "\u8BF7\u68C0\u67E5\u5168\u90E8\u6587\u4EF6\u5DEE\u5F02\uFF1B\u5019\u9009\u6216\u9875\u9762\u53D8\u5316\u540E\u987B\u91CD\u65B0\u9884\u89C8\u3002\u6279\u51C6\u65F6\u8BF7\u907F\u514D\u5176\u4ED6\u7A0B\u5E8F\u540C\u65F6\u4FEE\u6539\u8FD9\u4E9B\u9875\u9762\u3002",
+  "wiki.back": "\u8FD4\u56DE\u5BA1\u6838",
+  "wiki.approve": "\u6279\u51C6\u5E76\u5199\u5165 Wiki",
+  "wiki.reject": "\u62D2\u7EDD\u5019\u9009",
+  "wiki.save": "\u4FDD\u5B58\u4FEE\u6539",
+  "wiki.preview": "\u67E5\u770B\u5199\u5165\u9884\u89C8",
+  "wiki.status.pending": "\u5F85\u5BA1\u6838",
+  "wiki.status.rejected": "\u5DF2\u62D2\u7EDD",
+  "wiki.status.written": "\u5DF2\u5199\u5165",
+  "workspace.lastObservedAt": "\u72B6\u6001\u6700\u540E\u89C2\u5BDF\uFF1A{{at}}",
+  "runtime.lastObservedApproval": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u7B49\u5F85\u7528\u6237\u6388\u6743",
+  "runtime.lastObservedInput": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u7B49\u5F85\u7528\u6237\u8F93\u5165",
   "runtime.lastObservedRunning": "\u4E0A\u6B21\u89C2\u5BDF\uFF1A\u6267\u884C\u4E2D",
   "session.historicalCompleted": "\u5DF2\u5B8C\u6210\uFF08\u5386\u53F2\u5F52\u7C7B\uFF09",
   "board.pending": "\u5F85\u786E\u8BA4",
@@ -43371,8 +43674,8 @@ var zh_CN_default2 = {
   "state.manualExecuting": "\u6267\u884C\u4E2D",
   "runtime.queued": "\u7B49\u5F85\u6267\u884C",
   "runtime.running": "\u6B63\u5728\u6267\u884C",
-  "runtime.waitingApproval": "\u7B49\u5F85\u5BA1\u6279",
-  "runtime.waitingInput": "\u7B49\u5F85\u8F93\u5165",
+  "runtime.waitingApproval": "\u7B49\u5F85\u7528\u6237\u6388\u6743",
+  "runtime.waitingInput": "\u7B49\u5F85\u7528\u6237\u8F93\u5165",
   "runtime.interrupted": "\u5DF2\u4E2D\u65AD",
   "runtime.failed": "\u6267\u884C\u5931\u8D25",
   "runtime.pendingConfirmation": "\u5F85\u786E\u5B9A",
@@ -43380,8 +43683,8 @@ var zh_CN_default2 = {
   "runtime.unknown": "\u72B6\u6001\u672A\u786E\u8BA4",
   "runtime.planningQueued": "\u7B49\u5F85\u89C4\u5212",
   "runtime.planningRunning": "\u6B63\u5728\u89C4\u5212",
-  "runtime.planningApproval": "\u89C4\u5212\u7B49\u5F85\u5BA1\u6279",
-  "runtime.planningInput": "\u89C4\u5212\u7B49\u5F85\u8F93\u5165",
+  "runtime.planningApproval": "\u89C4\u5212\u7B49\u5F85\u7528\u6237\u6388\u6743",
+  "runtime.planningInput": "\u89C4\u5212\u7B49\u5F85\u7528\u6237\u8F93\u5165",
   "runtime.planningInterrupted": "\u89C4\u5212\u5DF2\u4E2D\u65AD",
   "runtime.planningFailed": "\u89C4\u5212\u5931\u8D25",
   "schedule.title": "\u6392\u671F\u4E0E\u4EFB\u52A1\u5F52\u5C5E",
@@ -43628,6 +43931,50 @@ var zh_CN_default2 = {
   "review.actualRevision": " \xB7 \u5B9E\u9645\u5BA1\u9605 r{{revision}}",
   "delete.title": "\u786E\u8BA4\u5220\u9664",
   "delete.hint": "\u53EA\u6709\u672A\u6267\u884C\u4E14\u6CA1\u6709\u5F15\u7528\u548C\u65F6\u95F4\u8BB0\u5F55\u7684\u6570\u636E\u53EF\u4EE5\u5220\u9664\u3002\u5DF2\u6709\u6267\u884C\u8BB0\u5F55\u7684\u4EFB\u52A1\u8BF7\u53D6\u6D88\u3002",
+  "session.summaryGenerate": "\u751F\u6210\u6982\u8981",
+  "session.summaryQueued": "\u6982\u8981\u5DF2\u52A0\u5165\u751F\u6210\u961F\u5217",
+  "session.summaryPending": "\u6982\u8981\u5C1A\u672A\u751F\u6210",
+  "session.summaryGenerating": "\u6B63\u5728\u751F\u6210\u4F1A\u8BDD\u6982\u8981\u2026",
+  "session.summaryFailed": "\u6982\u8981\u751F\u6210\u5931\u8D25\uFF0C\u7A0D\u540E\u81EA\u52A8\u91CD\u8BD5",
+  "session.summaryPartial": "\u6839\u636E\u4F1A\u8BDD\u90E8\u5206\u5185\u5BB9\u751F\u6210",
+  "session.summaryOutdated": "\u4F1A\u8BDD\u5DF2\u6709\u66F4\u65B0\uFF0C\u6982\u8981\u5F85\u5237\u65B0",
+  "batch.groupProjects": "\u6309\u9879\u76EE\u5206\u7EC4",
+  "batch.completeAll": "\u4E00\u952E\u5168\u90E8\u5B8C\u6210",
+  "batch.pendingRange": "\u5F85\u786E\u8BA4\u65F6\u95F4\u8303\u56F4",
+  "batch.completedRange": "\u5DF2\u5B8C\u6210\u65F6\u95F4\u8303\u56F4",
+  "batch.lastDays": "\u8FD1 {{count}} \u5929",
+  "batch.lastTwoDays": "\u8FD1 2 \u5929",
+  "batch.lastSevenDays": "\u8FD1 7 \u5929",
+  "batch.allTime": "\u5168\u90E8\u65F6\u95F4",
+  "batch.custom": "\u81EA\u5B9A\u4E49",
+  "batch.invalidRange": "\u5F00\u59CB\u65E5\u671F\u4E0D\u80FD\u665A\u4E8E\u7ED3\u675F\u65E5\u671F",
+  "batch.startDate": "\u5F00\u59CB\u65E5\u671F",
+  "batch.endDate": "\u7ED3\u675F\u65E5\u671F",
+  "batch.unknownCreated": "\u521B\u5EFA\u65F6\u95F4\u672A\u77E5",
+  "batch.created": "\u521B\u5EFA",
+  "batch.taskNotAccepted": "\u4F1A\u8BDD\u5DF2\u5F52\u6863\uFF0C\u4EFB\u52A1\u5C1A\u672A\u9A8C\u6536",
+  "batch.completeProject": "\u4E00\u952E\u5B8C\u6210\u5F85\u786E\u8BA4",
+  "batch.interrupted": "\u4E2D\u65AD\u6216\u5F02\u5E38",
+  "batch.title": "\u786E\u8BA4\u5B8C\u6210\u4F1A\u8BDD",
+  "batch.description": "\u5C06\u6240\u9009\u4F1A\u8BDD\u79FB\u81F3\u201C\u5DF2\u5B8C\u6210\u201D\uFF0C\u4E0D\u4F1A\u505C\u6B62\u6B63\u5728\u8FD0\u884C\u7684\u4F1A\u8BDD\uFF0C\u4E5F\u4E0D\u4F1A\u9A8C\u6536\u5173\u8054\u4EFB\u52A1\u3002",
+  "batch.selected": "\u5DF2\u9009\u62E9 {{count}} / {{total}} \u4E2A\u4F1A\u8BDD",
+  "batch.runningWarning": "\u6807\u8BB0\u5B8C\u6210\u4E0D\u4F1A\u505C\u6B62\u8FD0\u884C\u4E2D\u7684\u4F1A\u8BDD\uFF1B\u540E\u7EED\u6D3B\u52A8\u4F1A\u4F7F\u4F1A\u8BDD\u91CD\u65B0\u663E\u793A\u3002",
+  "batch.confirm": "\u786E\u8BA4\u5B8C\u6210\uFF08{{count}}\uFF09",
+  "batch.success": "\u5DF2\u5B8C\u6210 {{count}} \u4E2A\u4F1A\u8BDD",
+  "batch.result": "\u5DF2\u5B8C\u6210 {{succeeded}} \u4E2A\uFF0C\u672A\u5B8C\u6210 {{failed}} \u4E2A",
+  "batch.selectAll": "\u5168\u9009",
+  "batch.deselectAll": "\u53D6\u6D88\u5168\u9009",
+  "batch.statusSelection": "\u6309\u4F1A\u8BDD\u72B6\u6001\u9009\u62E9",
+  "batch.refreshState": "\u5237\u65B0\u72B6\u6001",
+  "batch.unknownFailure": "\u64CD\u4F5C\u672A\u5B8C\u6210\uFF0C\u8BF7\u5237\u65B0\u72B6\u6001\u540E\u91CD\u8BD5\u3002",
+  "batch.processing": "\u5904\u7406\u4E2D",
+  "batch.empty": "\u5F53\u524D\u8303\u56F4\u5185\u6CA1\u6709\u9700\u8981\u5904\u7406\u7684\u4F1A\u8BDD\u3002",
+  "batch.footerHint": "\u540E\u7EED\u6709\u65B0\u6D3B\u52A8\u65F6\uFF0C\u4F1A\u8BDD\u4F1A\u91CD\u65B0\u663E\u793A",
+  "batch.archive": "\u786E\u8BA4\u5F52\u6863",
+  "settings.sessionAge": "\u4F1A\u8BDD\u5C55\u793A\u8303\u56F4",
+  "settings.sessionAgeDays": "\u6700\u8FD1\u66F4\u65B0\u5929\u6570",
+  "settings.sessionAgeHint": "\u8F93\u5165 0 \u8868\u793A\u4E0D\u9650\u5236\uFF1B\u8D85\u8FC7\u5929\u6570\u7684\u4F1A\u8BDD\u5C06\u9690\u85CF\uFF0C\u6570\u636E\u4E0D\u4F1A\u5220\u9664\u3002\u65E0\u6CD5\u786E\u5B9A\u66F4\u65B0\u65F6\u95F4\u7684\u4F1A\u8BDD\u4ECD\u4F1A\u663E\u793A\u3002",
+  "settings.sessionAgeSaved": "\u4F1A\u8BDD\u5C55\u793A\u8303\u56F4\u5DF2\u4FDD\u5B58",
   "settings.language": "\u8BED\u8A00",
   "settings.followSystem": "\u8DDF\u968F\u7CFB\u7EDF",
   "settings.languageHint": "\u81EA\u52A8\u6A21\u5F0F\u4F18\u5148\u8DDF\u968F Codex \u5BBF\u4E3B\u8BED\u8A00\uFF0C\u5176\u6B21\u8DDF\u968F\u6D4F\u89C8\u5668\u8BED\u8A00\u3002",
@@ -43767,6 +44114,35 @@ var i18n = createInstance();
 void i18n.init({ resources, lng: "zh-CN", fallbackLng: "en", supportedLngs: Object.keys(languages), load: "currentOnly", keySeparator: false, nsSeparator: false, initAsync: false, interpolation: { escapeValue: false } });
 var isTranslationKey = (value) => typeof value === "string" && Object.hasOwn(en_default3, value);
 
+// src/experience-chat.ts
+var reportSchema = external_exports.object({
+  version: external_exports.literal(1),
+  sourceId: external_exports.string().uuid(),
+  threadId: external_exports.string().uuid(),
+  stage: external_exports.enum(["ready", "reading", "reviewing", "planning", "awaiting_approval", "writing", "checking", "completed", "no_knowledge", "failed"]),
+  summary: external_exports.string().max(300),
+  updatedAt: external_exports.iso.datetime({ offset: true })
+}).strict();
+
+// src/domain.ts
+import { DatabaseSync } from "node:sqlite";
+
+// src/wiki-agent-state.ts
+import { isAbsolute, join as join2, relative, resolve as resolve2, sep } from "node:path";
+
+// src/paths.ts
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+var dataDir = resolve(process.env.AI_TODOS_DATA_DIR || join(homedir(), ".ai-todos"));
+var dbPath = join(dataDir, "ai-todos.sqlite");
+var runtimePath = join(dataDir, "runtime.json");
+var port = Number(process.env.AI_TODOS_PORT || 16943);
+if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("AI_TODOS_PORT must be an integer between 1024 and 65535");
+var origin = `http://127.0.0.1:${port}`;
+
+// src/wiki-agent-state.ts
+var wikiAgentRoot = join2(dataDir, "wiki-agent", "tasks");
+
 // src/domain.ts
 var text = external_exports.string().trim().min(1).max(300);
 var note = external_exports.string().max(2e4);
@@ -43784,7 +44160,7 @@ var schemas = {
 };
 var kinds = external_exports.enum(Object.keys(schemas));
 var revision = external_exports.number().int().positive();
-var settingsSchema = external_exports.object({ reminders: external_exports.boolean(), followUpMinutes: external_exports.number().int().min(0).max(10080), reviewTime: external_exports.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(), timezone: external_exports.string().refine((v) => {
+var settingsSchema = external_exports.object({ sessionMaxAgeDays: external_exports.number().int().min(0).max(36500).optional(), reminders: external_exports.boolean(), followUpMinutes: external_exports.number().int().min(0).max(10080), reviewTime: external_exports.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(), timezone: external_exports.string().refine((v) => {
   try {
     new Intl.DateTimeFormat("en", { timeZone: v });
     return true;
@@ -43808,7 +44184,7 @@ var commandSchema = external_exports.discriminatedUnion("action", [
 ]);
 var reviewSchema = external_exports.object({ id, revision, decision: external_exports.enum(["accept", "reject"]), confirmed: external_exports.literal(true), reviewer: text, note: note.default("") }).strict();
 var taskCompleteSchema = reviewSchema.pick({ id: true, revision: true, confirmed: true });
-var sessionConfirmSchema = external_exports.object({ id, observedAt: date5, event: external_exports.string().min(1).max(200), turnId: external_exports.string().max(200).nullable(), catalogUpdatedAt: date5.nullable(), confirmed: external_exports.literal(true) }).strict();
+var sessionConfirmSchema = external_exports.object({ id, observedAt: date5, event: external_exports.string().min(1).max(200), turnId: external_exports.string().max(200).nullable(), catalogUpdatedAt: date5.nullable(), confirmed: external_exports.literal(true), archive: external_exports.literal(true).optional() }).strict();
 function errorPayload(error62) {
   const message = error62 instanceof Error ? error62.message : String(error62);
   if (error62 instanceof external_exports.ZodError) {
@@ -43829,8 +44205,53 @@ function errorPayload(error62) {
   return { error: message };
 }
 
+// src/wiki-models.ts
+var wikiModelSelectionSchema = external_exports.object({
+  model: external_exports.string().min(1).max(200),
+  reasoningEffort: external_exports.string().min(1).max(80).nullable()
+}).strict();
+var modelSchema = external_exports.object({
+  id: external_exports.string(),
+  model: external_exports.string().min(1),
+  displayName: external_exports.string(),
+  defaultReasoningEffort: external_exports.string().nullable().optional(),
+  supportedReasoningEfforts: external_exports.array(external_exports.object({ reasoningEffort: external_exports.string(), description: external_exports.string() })),
+  isDefault: external_exports.boolean().optional(),
+  hidden: external_exports.boolean().optional()
+});
+var pageSchema = external_exports.object({ data: external_exports.array(modelSchema), nextCursor: external_exports.string().nullable() });
+
+// src/wiki-extract.ts
+var selectionSchema = external_exports.object({ paths: external_exports.array(external_exports.string()).max(8), humanPaths: external_exports.array(external_exports.string()).max(8).default([]) }).strict();
+var noteSchema = external_exports.object({
+  wikiPath: external_exports.string(),
+  wikiContent: external_exports.string().max(5e5),
+  humanPath: external_exports.string(),
+  humanContent: external_exports.string().max(5e5)
+}).strict();
+var resultSchema = external_exports.object({
+  summary: external_exports.string().max(2e4),
+  scope: external_exports.string().max(2e4),
+  evidence: external_exports.string().max(2e4),
+  unverified: external_exports.string().max(2e4),
+  relation: external_exports.string().max(2e4),
+  changes: external_exports.array(external_exports.object({ path: external_exports.string(), content: external_exports.string().max(5e5) }).strict()).max(8),
+  newNotes: external_exports.array(noteSchema).max(3).default([])
+}).strict();
+
+// src/wiki-native-extract.ts
+var initialSchema = external_exports.object({ sessionSummary: external_exports.string().max(2e4), items: external_exports.array(external_exports.object({ title: external_exports.string().min(1).max(1e3), conclusion: external_exports.string().max(2e4), scope: external_exports.string().max(2e4), evidence: external_exports.string().max(2e4), unverified: external_exports.string().max(2e4) }).strict()).max(30) }).strict();
+var pageArgs = external_exports.object({ page: external_exports.number().int().nonnegative() }).strict();
+var indexArgs = external_exports.object({ offset: external_exports.number().int().nonnegative() }).strict();
+
+// src/wiki-thread-reader.ts
+var pageSchema2 = external_exports.object({
+  data: external_exports.array(external_exports.object({ turnId: external_exports.string(), item: external_exports.object({ type: external_exports.string(), id: external_exports.string() }).passthrough() })),
+  nextCursor: external_exports.string().nullable()
+});
+
 // src/codex.ts
-import { basename, isAbsolute, join as join2, normalize } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join3, normalize } from "node:path";
 
 // node_modules/ws/wrapper.mjs
 var import_stream = __toESM(require_stream(), 1);
@@ -43842,39 +44263,60 @@ var import_subprotocol = __toESM(require_subprotocol(), 1);
 var import_websocket = __toESM(require_websocket(), 1);
 var import_websocket_server = __toESM(require_websocket_server(), 1);
 
-// src/paths.ts
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-var dataDir = resolve(process.env.AI_TODOS_DATA_DIR || join(homedir(), ".ai-todos"));
-var dbPath = join(dataDir, "ai-todos.sqlite");
-var runtimePath = join(dataDir, "runtime.json");
-var port = Number(process.env.AI_TODOS_PORT || 16943);
-if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("AI_TODOS_PORT must be an integer between 1024 and 65535");
-var origin = `http://127.0.0.1:${port}`;
-
 // src/codex.ts
 var draftSchema = schemas.task.pick({ title: true, description: true, criteria: true, projectId: true });
 var suggestionSchema = schemas.task.pick({ description: true, criteria: true }).required();
 var definitionSuggestionSchema = schemas.task.pick({ title: true, description: true, criteria: true }).required();
 var captureSuggestionSchema = definitionSuggestionSchema.extend({ suggestedSteps: external_exports.array(definitionSuggestionSchema).max(20), reason: external_exports.string().max(1e3) }).strict();
-var pageSchema = external_exports.object({ data: external_exports.array(external_exports.object({ id: external_exports.string().uuid(), name: schemas.project.shape.title, roots: external_exports.array(external_exports.object({ path: external_exports.string().min(1).max(2e3).refine(isAbsolute, "errors.projectPath") })) })), nextCursor: external_exports.string().nullable() });
+var pageSchema3 = external_exports.object({ data: external_exports.array(external_exports.object({ id: external_exports.string().uuid(), name: schemas.project.shape.title, roots: external_exports.array(external_exports.object({ path: external_exports.string().min(1).max(2e3).refine(isAbsolute2, "errors.projectPath") })) })), nextCursor: external_exports.string().nullable() });
 var mcpPageSchema = external_exports.object({ data: external_exports.array(external_exports.object({ name: external_exports.string().min(1) })), nextCursor: external_exports.string().nullable() });
-var threadPageSchema = external_exports.object({ data: external_exports.array(external_exports.object({ id: external_exports.string().uuid(), name: external_exports.string().nullable().optional(), preview: external_exports.string(), cwd: external_exports.string().min(1).max(2e3).refine(isAbsolute, "errors.sessionPath"), path: external_exports.string().min(1).max(2e3).refine(isAbsolute, "errors.sessionPath").nullable().optional(), projectId: external_exports.string().uuid().nullable().optional(), parentThreadId: external_exports.string().nullable().optional(), ephemeral: external_exports.boolean(), updatedAt: external_exports.number().int().nonnegative(), status: external_exports.object({ type: external_exports.string(), activeFlags: external_exports.array(external_exports.string()).optional() }) })), nextCursor: external_exports.string().nullable() });
+var threadPageSchema = external_exports.object({ data: external_exports.array(external_exports.object({ id: external_exports.string().uuid(), name: external_exports.string().nullable().optional(), preview: external_exports.string(), cwd: external_exports.string().min(1).max(2e3).refine(isAbsolute2, "errors.sessionPath"), path: external_exports.string().min(1).max(2e3).refine(isAbsolute2, "errors.sessionPath").nullable().optional(), projectId: external_exports.string().uuid().nullable().optional(), parentThreadId: external_exports.string().nullable().optional(), ephemeral: external_exports.boolean(), createdAt: external_exports.number().int().nonnegative().optional(), updatedAt: external_exports.number().int().nonnegative(), status: external_exports.object({ type: external_exports.string(), activeFlags: external_exports.array(external_exports.string()).optional() }) })), nextCursor: external_exports.string().nullable() });
 var localeSchema = external_exports.enum(Object.keys(languages)).optional();
 var codexActionSchema = external_exports.discriminatedUnion("operation", [
   external_exports.object({ operation: external_exports.literal("prepare_task_session"), id: external_exports.string().uuid(), revision: external_exports.number().int().positive(), locale: localeSchema }).strict(),
   external_exports.object({ operation: external_exports.literal("open_session"), id: external_exports.string().uuid(), prefillTask: external_exports.boolean().optional(), locale: localeSchema }).strict(),
   external_exports.object({ operation: external_exports.literal("sync_projects") }).strict(),
   external_exports.object({ operation: external_exports.literal("sync_threads") }).strict(),
+  external_exports.object({ operation: external_exports.literal("summarize_session"), id: external_exports.string().uuid() }).strict(),
   external_exports.object({ operation: external_exports.literal("refine"), draft: draftSchema, field: external_exports.enum(["title", "description", "criteria"]).optional() }).strict(),
   external_exports.object({ operation: external_exports.literal("capture_refine"), draft: draftSchema }).strict()
 ]);
+
+// src/wiki-action-schema.ts
+var id2 = external_exports.string().uuid();
+var revision2 = external_exports.number().int().positive();
+var list = external_exports.object({ operation: external_exports.literal("list"), sessionId: id2 }).strict();
+var openCapture = external_exports.object({ operation: external_exports.literal("open_capture"), sessionId: id2 }).strict();
+var prepareCapture = external_exports.object({ operation: external_exports.literal("prepare_capture"), sessionId: id2 }).strict();
+var ackCapture = external_exports.object({ operation: external_exports.literal("ack_capture"), sessionId: id2, jobId: id2 }).strict();
+var archiveSession = external_exports.object({ operation: external_exports.literal("archive_session"), confirmation: sessionConfirmSchema.extend({ archive: external_exports.literal(true) }) }).strict();
+var models = external_exports.object({ operation: external_exports.literal("models") }).strict();
+var generate = external_exports.object({ operation: external_exports.literal("generate"), sessionId: id2, modelSelection: wikiModelSelectionSchema.optional() }).strict();
+var start = external_exports.object({ operation: external_exports.literal("start"), sessionId: id2, modelSelection: wikiModelSelectionSchema.optional() }).strict();
+var progress = external_exports.object({ operation: external_exports.literal("progress"), sessionId: id2 }).strict();
+var cancel = external_exports.object({ operation: external_exports.literal("cancel"), sessionId: id2 }).strict();
+var update = external_exports.object({ operation: external_exports.literal("update"), id: id2, revision: revision2, data: external_exports.unknown() }).strict();
+var reject = external_exports.object({ operation: external_exports.literal("reject"), id: id2, revision: revision2, note: external_exports.string().max(2e4) }).strict();
+var preview = external_exports.object({ operation: external_exports.literal("preview"), id: id2, revision: revision2 }).strict();
+var compare = external_exports.object({ operation: external_exports.literal("compare"), id: id2, revision: revision2, modelSelection: wikiModelSelectionSchema.optional() }).strict();
+var approve = external_exports.object({ operation: external_exports.literal("approve"), ticket: external_exports.string().regex(/^[a-f0-9]{48}$/) }).strict();
+var openReview = external_exports.object({ operation: external_exports.literal("open_review"), id: id2, revision: revision2 }).strict();
+var wikiActionSchema = external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, generate, start, progress, cancel, update, reject, compare, preview, approve]);
+var wikiUiSchema = external_exports.object({
+  uiSessionId: id2,
+  bridgeRevision: external_exports.literal(1).optional(),
+  action: external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, generate, start, progress, cancel, update, reject, compare, preview, openReview])
+}).strict();
+var wikiBridgeSchema = external_exports.object({
+  uiSessionId: id2,
+  action: external_exports.object({ operation: external_exports.string().min(1) }).passthrough()
+}).strict();
 
 // src/service-client.ts
 import { fileURLToPath } from "node:url";
 import { readFileSync, mkdirSync, openSync, closeSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
 
 // package.json
 var package_default = {
@@ -43908,6 +44350,8 @@ var package_default = {
     "react-day-picker": "9.14.0",
     "react-dom": "19.1.1",
     "react-i18next": "17.0.16",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     ws: "8.22.0",
     zod: "4.6.5"
   },
@@ -43929,8 +44373,11 @@ async function connect() {
     if (candidate.origin !== origin) throw new Error("Port does not match");
     const response = await fetch(`${origin}/internal/ping`, { headers: { authorization: `Bearer ${candidate.token}` }, signal: AbortSignal.timeout(600) });
     if (response.ok) {
+      const capabilities = await response.json();
       const health = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(600) }).then((response2) => response2.json());
-      if (health.name === "ai-todos" && typeof health.version === "string" && package_default.version.localeCompare(health.version, void 0, { numeric: true }) > 0) {
+      const comparison = typeof health.version === "string" ? package_default.version.localeCompare(health.version, void 0, { numeric: true }) : -1;
+      const revision3 = typeof capabilities.wikiUiRevision === "number" ? capabilities.wikiUiRevision : 0;
+      if (health.name === "ai-todos" && (comparison > 0 || comparison === 0 && revision3 < 8)) {
         const stopped = await fetch(`${origin}/internal/stop`, { method: "POST", headers: { authorization: `Bearer ${candidate.token}` }, signal: AbortSignal.timeout(1e3) });
         if (!stopped.ok) throw new Error("\u65E7\u670D\u52A1\u505C\u6B62\u5931\u8D25");
         return false;
@@ -43945,17 +44392,17 @@ async function connect() {
 async function ensureService() {
   if (await connect()) return runtime;
   mkdirSync(dataDir, { recursive: true, mode: 448 });
-  const log = openSync(join3(dataDir, "service.log"), "a", 384);
+  const log = openSync(join4(dataDir, "service.log"), "a", 384);
   const child = spawn(process.execPath, [fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "../src/server.ts" : "../src/server.js", import.meta.url))], { detached: true, stdio: ["ignore", log, log], env: process.env });
   child.on("error", () => {
   });
   child.unref();
   closeSync(log);
   for (let n = 0; n < 40; n++) {
-    await new Promise((resolve2) => setTimeout(resolve2, 100));
+    await new Promise((resolve3) => setTimeout(resolve3, 100));
     if (await connect()) return runtime;
   }
-  const params = { path: join3(dataDir, "service.log"), origin };
+  const params = { path: join4(dataDir, "service.log"), origin };
   throw Object.assign(new Error(i18n.t("errors.serviceStart", { ...params, lng: "zh-CN" })), { code: "errors.serviceStart", params });
 }
 async function service(path, value) {
@@ -43964,7 +44411,7 @@ async function service(path, value) {
     method: value === void 0 ? "GET" : "POST",
     headers: { authorization: `Bearer ${runtime.token}`, "content-type": "application/json" },
     ...value === void 0 ? {} : { body: JSON.stringify(value) },
-    signal: AbortSignal.timeout(path === "codex" ? 13e4 : 1e4)
+    signal: AbortSignal.timeout(path === "wiki" ? 186e4 : path === "codex" ? 13e4 : 1e4)
   });
   let response = await request();
   if (response.status === 401) {
@@ -44019,6 +44466,7 @@ server.registerTool("ai_todos_manage", {
   _meta: { ui: { visibility: ["model", "app"] } }
 }, guarded((args) => service("command", args.command)));
 server.registerTool("ai_todos_codex", { description: "Sync Codex projects and conversations, prepare and bind a task conversation, open an observed session in the desktop app, or generate a definition suggestion. Creating/opening a session does not execute or accept a task.", inputSchema: external_exports.object({ action: codexActionSchema }), annotations: { readOnlyHint: false, openWorldHint: true }, _meta: { ui: { visibility: ["app"] } } }, guarded((args) => service("codex", args.action)));
+server.registerTool("ai_todos_wiki", { description: "App UI only: open or reuse a native Codex experience conversation with prepared source and instructions. Legacy Wiki candidate history and local review remain available. This tool cannot approve or write the Wiki.", inputSchema: wikiBridgeSchema, annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, guarded((args) => service("wiki", { ...args, bridgeRevision: 1 })));
 server.registerTool("ai_todos_confirm_session", { description: "Record the human UI action confirming an unbound, stopped conversation complete at its displayed observation. This is not business task acceptance.", inputSchema: sessionConfirmSchema, annotations: { readOnlyHint: false, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, guarded((args) => service("session-confirm", args)));
 G(server, "ai-todos workspace", uri, { description: "Persistent local productivity workspace" }, async () => ({ contents: [{ uri, mimeType: L, text: readFileSync2(new URL("../dist/app.html", import.meta.url), "utf8").replaceAll("__AI_TODOS_ORIGIN__", origin), _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: false }, "openai/ui": { availableDisplayModes: ["inline", "fullscreen"] } } }] }));
 server.registerTool("ai_todos_complete_task", { description: "Record an explicit human UI action confirming the displayed revision of a stopped task complete. Not available to AI.", inputSchema: taskCompleteSchema, annotations: { readOnlyHint: false, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, guarded((args) => service("task-complete", args)));

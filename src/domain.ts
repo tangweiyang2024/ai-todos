@@ -1,3 +1,7 @@
+import { experienceProgress, readExperienceReport } from './experience-chat.ts';
+import type { ExperienceChat } from './experience-chat.ts';
+import { preparationView } from './experience-preparation.ts';
+import type { ExperiencePreparation } from './experience-preparation.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -7,6 +11,7 @@ import enErrors from 'zod/v4/locales/en.js';
 import zhErrors from 'zod/v4/locales/zh-CN.js';
 import type { Kind, EntityData, Entity, Task, Focus, Settings, Session, LiveSession, Snapshot, TimeRecord, TaskEvent, CodexProject, CodexThread, Command } from './types.ts';
 import { runtimeState } from './runtime.ts';
+import { isWikiAgentCwd } from './wiki-agent-state.ts';
 import { i18n, isTranslationKey, languages } from './i18n.ts';
 import type { TranslationKey } from './i18n.ts';
 
@@ -26,7 +31,7 @@ export const schemas = {
 };
 const kinds = z.enum(Object.keys(schemas) as [Kind, ...Kind[]]);
 const revision = z.number().int().positive();
-export const settingsSchema = z.object({ reminders: z.boolean(), followUpMinutes: z.number().int().min(0).max(10080), reviewTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(), timezone: z.string().refine(v => { try { new Intl.DateTimeFormat('en', { timeZone: v }); return true; } catch { return false; } }, "errors.invalidTimezone") }).strict();
+export const settingsSchema = z.object({ sessionMaxAgeDays: z.number().int().min(0).max(36500).optional(), reminders: z.boolean(), followUpMinutes: z.number().int().min(0).max(10080), reviewTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(), timezone: z.string().refine(v => { try { new Intl.DateTimeFormat('en', { timeZone: v }); return true; } catch { return false; } }, "errors.invalidTimezone") }).strict();
 export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), kind: kinds, data: z.record(z.string(), z.unknown()), requestId: id, planDate: z.iso.date().optional() }).strict(),
   z.object({ action: z.literal('create_tasks'), data: z.array(schemas.task).min(1).max(20), requestId: id, planDate: z.iso.date() }).strict(),
@@ -43,7 +48,7 @@ export const commandSchema = z.discriminatedUnion('action', [
 ]);
 const reviewSchema = z.object({ id, revision, decision: z.enum(['accept', 'reject']), confirmed: z.literal(true), reviewer: text, note: note.default('') }).strict();
 export const taskCompleteSchema = reviewSchema.pick({ id: true, revision: true, confirmed: true });
-export const sessionConfirmSchema = z.object({ id, observedAt: date, event: z.string().min(1).max(200), turnId: z.string().max(200).nullable(), catalogUpdatedAt: date.nullable(), confirmed: z.literal(true) }).strict();
+export const sessionConfirmSchema = z.object({ id, observedAt: date, event: z.string().min(1).max(200), turnId: z.string().max(200).nullable(), catalogUpdatedAt: date.nullable(), confirmed: z.literal(true), archive: z.literal(true).optional() }).strict();
 export class DomainError extends Error {
   declare status: number;
   declare code: TranslationKey;
@@ -122,15 +127,75 @@ export class Store {
   }
   taskHistory(taskId: string): TaskEvent[] { return this.db.prepare('SELECT body FROM events WHERE task_id=? ORDER BY rowid DESC').all(taskId).map(r => JSON.parse(r.body as string)); }
   focus(): Focus { return this.meta('focus', { revision: 0, taskId: null, status: 'idle', elapsedMs: 0, startedAt: null, segments: [] }); }
-  settings(): Settings { return this.meta('settings', { revision: 0, reminders: true, followUpMinutes: 60, reviewTime: '18:00', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }); }
+  settings(): Settings { return { sessionMaxAgeDays: 2, ...this.meta<Settings>('settings', { revision: 0, reminders: true, followUpMinutes: 60, reviewTime: '18:00', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }) }; }
+  /** 注册内部整理线程；关联持久化后，即使线程工作目录变化也不会成为业务会话。 */
+  registerBackgroundSession(threadId: string, jobId: string) { this.setMeta(`wiki.agent.${threadId}`, { jobId }); }
+  /** 通过持久身份和私有工作目录双重识别后台线程。 */
+  isBackgroundSession(threadId: string, cwd: string) { return isWikiAgentCwd(cwd) || this.meta(`wiki.agent.${threadId}`, null) !== null; }
+  /** 记录原会话与沉淀聊天的关联；沉淀聊天不进入普通业务列表。 */
+  registerExperienceChat(chat: ExperienceChat) {
+    this.transaction(() => {
+      this.setMeta(`experience.chat.${chat.sourceId}`, chat);
+      this.setMeta(`experience.thread.${chat.threadId}`, chat.sourceId);
+      this.registerBackgroundSession(chat.threadId, `experience:${chat.sourceId}`);
+    });
+  }
+  /** 获取所有已准备的沉淀聊天，供宿主状态同步使用。 */
+  experienceChats(): ExperienceChat[] {
+    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.chat.%'").all().map(row => JSON.parse(row.body as string));
+  }
+  /** 读取后台准备的持久化状态，供卡片投影及服务重启恢复使用。 */
+  experiencePreparations(): ExperiencePreparation[] {
+    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.preparation.%'").all().map(row => JSON.parse(row.body as string));
+  }
+  /** 查询沉淀会话的可信关联，不根据标题或路径猜测身份。 */
+  experienceChatForThread(id: string): ExperienceChat | null {
+    const sourceId = this.meta<string | null>(`experience.thread.${id}`, null);
+    return sourceId ? this.meta<ExperienceChat | null>(`experience.chat.${sourceId}`, null) : null;
+  }
+  /** 查询沉淀聊天是否已有真实轮次；开始记录、可信轮次标识和已核实结果均可跨重启复用。 */
+  experienceChatHasStarted(threadId: string): boolean {
+    const row = this.db.prepare('SELECT body FROM sessions WHERE id=?').get(threadId);
+    const session = row ? JSON.parse(row.body as string) as Session : null;
+    return !!session?.experienceStartedAt || !!session?.turnId || this.meta<boolean>(`experience.started.${threadId}`, false);
+  }
+  /** 同步沉淀聊天的原生状态；保留较新的 hook 观察，只供源卡片显示进度。 */
+  private syncExperienceChat(thread: CodexThread) {
+    // 保留较新 hook 及原有轮次，历史回退不能冒充实时运行。
+    const row = this.db.prepare('SELECT body FROM sessions WHERE id=?').get(thread.id);
+    const previous = row ? JSON.parse(row.body as string) as Session : null;
+    const at = thread.observation?.observedAt ?? thread.updatedAt;
+    if (previous && (thread.state === 'unknown' || (previous.source === 'codex-hook' && Date.parse(previous.observedAt) > Date.parse(at)))) return;
+    // 新一轮开始后持续使旧完成回报失效，即使随后收到 Stop。
+    const observation: Session = { ...previous, id: thread.id, cwd: thread.cwd, title: thread.title, observedState: thread.state, observedAt: at, event: 'thread/list', source: 'codex-app-server', catalogVisible: false, ...thread.observation };
+    const active = ['running', 'queued', 'waiting_input', 'waiting_approval'];
+    const turnId = thread.observation?.turnId;
+    const changedTurn = turnId && previous?.turnId ? turnId !== previous.turnId : !previous || !active.includes(previous.observedState);
+    if (['running', 'queued'].includes(thread.state) && changedTurn && !thread.observation?.experienceStartedAt) observation.experienceStartedAt = at;
+    // 没有真实开始时间时无法判断结束前的回报属于哪轮，保守隐藏它，等待本轮明确回报。
+    else if (turnId && previous?.turnId && turnId !== previous.turnId && !thread.observation?.experienceStartedAt && Date.parse(at) > Date.parse(previous.observedAt)) {
+      observation.experienceStartedAt = at;
+    }
+    this.db.prepare('INSERT OR REPLACE INTO sessions VALUES (?,?)').run(thread.id, JSON.stringify(observation));
+  }
   sessions(): LiveSession[] {
-    return this.db.prepare('SELECT body FROM sessions ORDER BY rowid DESC').all().map(r => {
-      const s = JSON.parse(r.body as string) as Session;
+    // 沉淀会话本身隐藏，只把运行状态和明确回报投影到对应的源会话。
+    const stored = this.db.prepare('SELECT body FROM sessions ORDER BY rowid DESC').all().map(r => JSON.parse(r.body as string) as Session);
+    const observations = new Map(stored.map(s => [s.id, s]));
+    const chats = new Map(this.experienceChats().map(chat => [chat.sourceId, chat]));
+    const preparations = new Map(this.experiencePreparations().map(job => [job.sourceId, preparationView(job)]));
+    return stored.filter(s => !this.isBackgroundSession(s.id, s.cwd)).map(s => {
       const state = runtimeState(s.observedState);
       const age = this.now() - Date.parse(s.observedAt);
       const extendedRunning = state === 'running' && s.source === 'codex-rollout' && s.event === 'task_started';
-      const expired = ['queued', 'running', 'waiting_approval', 'waiting_input'].includes(state) && age > (extendedRunning ? 1800000 : 300000);
-      return { ...s, state: expired ? 'unknown' : state, ...(!expired && extendedRunning && age > 300000 ? { stateConfidence: 'last_observed' as const } : {}) };
+      const pendingUser = ['waiting_approval', 'waiting_input'].includes(state) && ['codex-hook', 'codex-app-server', 'codex-rollout'].includes(s.source) && Number.isFinite(age);
+      const expired = ['queued', 'running', 'waiting_approval', 'waiting_input'].includes(state) && !pendingUser && age > (extendedRunning ? 1800000 : 300000);
+      const chat = chats.get(s.id);
+      const summary = this.meta<import('./types.ts').SessionSummary | null>(`session.summary.${s.id}`, null);
+      const summaryStatus = this.meta<string>(`session.summary-status.${s.id}`, '');
+      const experiencePreparation = preparations.get(s.id);
+      const experience = chat ? experienceProgress(chat, observations.get(chat.threadId) ?? null, readExperienceReport(chat, this.now()), this.now()) : undefined;
+      return { ...s, ...(summary ? { summary } : {}), ...(summaryStatus ? { summaryStatus } : {}), ...(experiencePreparation ? { experiencePreparation } : {}), ...(experience ? { experience } : {}), state: expired ? 'unknown' : state, ...(!expired && (extendedRunning || pendingUser) && age > 300000 ? { stateConfidence: 'last_observed' as const } : {}) };
     });
   }
   snapshot(): Snapshot {
@@ -207,21 +272,25 @@ export class Store {
     });
   }
   syncCodexThreads(threads: CodexThread[], complete = true) {
+    // 后台线程不能导入业务目录、绑定任务或递归成为经验来源。
+    const internal = threads.filter(thread => this.isBackgroundSession(thread.id, thread.cwd));
+    for (const thread of internal) if (this.experienceChatForThread(thread.id)) this.syncExperienceChat(thread);
+    threads = threads.filter(thread => !this.isBackgroundSession(thread.id, thread.cwd));
     return this.transaction(() => {
-      const existing = new Map(this.sessions().map(session => { const { state, stateConfidence, ...stored } = session; return [session.id, preserveConfirmation(stored)]; }));
+      const existing = new Map(this.sessions().map(session => { const { state, stateConfidence, experience, experiencePreparation, summary, summaryStatus, ...stored } = session; return [session.id, preserveConfirmation(stored)]; }));
       const seen = new Set(); let added = 0, updated = 0;
       for (const thread of threads) {
         if (seen.has(thread.id)) continue;
         seen.add(thread.id);
         const previous = existing.get(thread.id);
-        const session = { ...previous, id: thread.id, title: thread.title, preview: thread.preview, cwd: thread.cwd, codexProjectId: thread.projectId, catalogUpdatedAt: thread.updatedAt, catalogVisible: true } as Session;
-        if (previous?.catalogUpdatedAt && Date.parse(thread.updatedAt) > Date.parse(previous.catalogUpdatedAt)) delete session.confirmedAt;
+        const session = { ...previous, id: thread.id, title: thread.title, preview: thread.preview, cwd: thread.cwd, codexProjectId: thread.projectId, catalogCreatedAt: thread.createdAt ?? previous?.catalogCreatedAt, catalogUpdatedAt: thread.updatedAt, catalogVisible: true } as Session;
+        if (previous?.catalogUpdatedAt && Date.parse(thread.updatedAt) > Date.parse(previous.catalogUpdatedAt)) { delete session.confirmedAt; delete session.archiveConfirmed; }
         const observation = thread.observation;
         const retainHook = observation && previous?.source === 'codex-hook' && (Date.parse(previous.observedAt) > Date.parse(observation.observedAt)
           || (thread.state === 'running' && ['waiting_approval', 'waiting_input'].includes(runtimeState(previous.observedState)) && previous.turnId === observation.turnId));
         if (!retainHook && (thread.state !== 'unknown' || !previous)) {
           Object.assign(session, { observedState: thread.state, observedAt: this.at(), event: 'thread/list', source: 'codex-app-server', ...observation });
-          if (!['idle', 'completed'].includes(runtimeState(thread.state)) || (observation && observation.turnId !== previous?.turnId)) delete session.confirmedAt;
+          if ((!['idle', 'completed'].includes(runtimeState(thread.state)) && (!previous?.archiveConfirmed || runtimeState(thread.state) !== runtimeState(previous.observedState))) || (observation && observation.turnId !== previous?.turnId)) { delete session.confirmedAt; delete session.archiveConfirmed; }
         }
         if (!retainHook && (thread.state !== 'unknown' || observation)) recordSessionActivity(session, previous ?? null, runtimeState(session.observedState), observation?.observedAt ?? thread.updatedAt, session.event, session.turnId);
         if (JSON.stringify(session) === JSON.stringify(previous)) continue;
@@ -301,7 +370,7 @@ export class Store {
       }
       if (c.action === 'focus') return this.changeFocus(c);
       if (c.action === 'settings') {
-        this.check(this.settings(), c.revision); return this.setMeta('settings', { ...c.data, revision: c.revision + 1 });
+        this.check(this.settings(), c.revision); return this.setMeta('settings', { ...this.settings(), ...c.data, revision: c.revision + 1 });
       }
       if (c.action === 'ack') {
         const row = this.db.prepare('SELECT body FROM notices WHERE id=?').get(c.id);
@@ -381,10 +450,14 @@ export class Store {
       requireThat(row, "errors.sessionMissing", 404);
       let session = preserveConfirmation(JSON.parse(row.body as string));
       requireThat(session.observedAt === c.observedAt && session.event === c.event && (session.turnId ?? null) === c.turnId && (session.catalogUpdatedAt ?? null) === c.catalogUpdatedAt, "errors.staleSession", 409);
-      requireThat(['idle', 'completed'].includes(runtimeState(session.observedState)), "errors.confirmState");
-      requireThat(!this.all('task').some(task => task.sessionId === c.id && task.state !== 'cancelled'), "errors.taskAcceptance");
+      // 普通确认保留原有验收边界；显式归档只改变会话展示，不改变绑定任务。
+      if (!c.archive) {
+        requireThat(['idle', 'completed'].includes(runtimeState(session.observedState)), "errors.confirmState");
+        requireThat(!this.all('task').some(task => task.sessionId === c.id && task.state !== 'cancelled'), "errors.taskAcceptance");
+      }
       if (!session.confirmedAt) {
         session.confirmedAt = this.at();
+        if (c.archive) session.archiveConfirmed = true;
         session = preserveConfirmation(session);
         recordSessionActivity(session, session, 'confirmed', session.confirmedAt!, 'human_confirmation', session.turnId);
         this.db.prepare('UPDATE sessions SET body=? WHERE id=?').run(JSON.stringify(session), session.id);
@@ -435,8 +508,9 @@ export class Store {
       const previous = row ? preserveConfirmation(JSON.parse(row.body as string)) : null;
       if (['Stop', 'Interrupt'].includes(event.hook_event_name) && previous?.turnId && event.turn_id && previous.turnId !== event.turn_id) return previous;
       const states = { SessionStart: 'idle', UserPromptSubmit: 'running', PreToolUse: 'running', PostToolUse: 'running', PermissionRequest: 'waiting_approval', Stop: 'idle', Interrupt: 'interrupted', SessionEnd: 'completed' };
-      const session = { ...previous, id: event.session_id, cwd: event.cwd, observedState: states[event.hook_event_name], observedAt: this.at(), event: event.hook_event_name, turnId: event.turn_id ?? previous?.turnId ?? null, source: 'codex-hook' };
-      if (!['SessionStart', 'Stop', 'SessionEnd'].includes(event.hook_event_name) || session.turnId !== previous?.turnId) delete session.confirmedAt;
+      const session: Session = { ...previous, id: event.session_id, cwd: event.cwd, observedState: states[event.hook_event_name], observedAt: this.at(), event: event.hook_event_name, turnId: event.turn_id ?? previous?.turnId ?? null, source: 'codex-hook' };
+      if (!['SessionStart', 'Stop', 'SessionEnd'].includes(event.hook_event_name) || session.turnId !== previous?.turnId) { delete session.confirmedAt; delete session.archiveConfirmed; }
+      if (event.hook_event_name === 'UserPromptSubmit' && this.experienceChatForThread(session.id)) session.experienceStartedAt = session.observedAt;
       recordSessionActivity(session, previous, session.observedState, session.observedAt, session.event, session.turnId);
       this.db.prepare('INSERT OR REPLACE INTO sessions VALUES (?,?)').run(session.id, JSON.stringify(session));
       if (event.hook_event_name === 'UserPromptSubmit') this.reopenAcceptedTask(session.id, session.observedAt, event.turn_id, previous?.turnId);
