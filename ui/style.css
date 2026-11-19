@@ -221,3 +221,7 @@ th{font-weight:500;color:var(--muted)}
 .timeline-drag-ghost.is-bar .timeline-drag-bar{opacity:1}
 .timeline-drag-ghost.is-settling{transition:left .18s ease,top .18s ease,width .18s ease,height .18s ease,border-radius .18s ease}
 @media(prefers-reduced-motion:reduce){.timeline-drag-ghost,.timeline-drag-card,.timeline-drag-bar,.timeline-drag-ghost.is-settling{transition:none}}
+
+.capture-model-settings { display: grid; gap: 14px; align-content: start; }
+.capture-model-settings h2 { display: flex; align-items: center; gap: 8px; }
+.capture-model-settings .note { margin: 0; line-height: 1.65; }

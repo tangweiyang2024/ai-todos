@@ -11,7 +11,7 @@ test('older clients do not stop a compatible newer service', async t => {
   const server = createServer((req, res) => {
     res.setHeader('content-type', 'application/json');
     if (req.url === '/health') return res.end(JSON.stringify({ name: 'ai-todos', version: '0.1.23' }));
-    if (req.url === '/internal/ping') return res.end(JSON.stringify({ ok: true, wikiUiRevision: 8 }));
+    if (req.url === '/internal/ping') return res.end(JSON.stringify({ ok: true, wikiUiRevision: 10 }));
     if (req.url === '/internal/stop') { stops++; res.statusCode = 503; return res.end('{}'); }
     res.statusCode = 404; res.end('{}');
   });

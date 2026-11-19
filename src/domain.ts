@@ -217,7 +217,7 @@ export class Store {
         return { ...t, ai: session ? { ...session, mode: t.state === 'defining' ? 'planning' : 'execution' } : null };
       }),
       projects: this.all('project'), objectives: this.all('objective'), keyResults: this.all('keyResult'), plans: this.all('plan'), inbox: this.all('inbox'), sessions,
-      focus: { ...this.focus(), totalMs: elapsed(this.focus(), this.now()) }, settings: this.settings(),
+      focus: { ...this.focus(), totalMs: elapsed(this.focus(), this.now()) }, settings: this.settings(), captureModelPreference: this.meta('experience.modelPreference', { revision: 0, selection: null }),
       notices: this.db.prepare('SELECT body FROM notices ORDER BY rowid DESC LIMIT 200').all().map(r => JSON.parse(r.body as string)),
       timeRecords: this.meta<TimeRecord[]>('timeRecords', []), serverTime: this.at(),
     };

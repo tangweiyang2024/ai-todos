@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from 'node:fs';
 import { Store, DomainError, errorPayload } from './domain.ts';
-import { codexAction, extractWikiExperience, generateSessionSummary, listWikiModels, openExperienceChat, prepareExperienceChat } from './codex.ts';
+import { codexAction, extractWikiExperience, generateSessionSummary, listWikiModels, openExperienceChat, prepareExperienceChat, startExperienceExtraction } from './codex.ts';
 import { ExperiencePreparations } from './experience-preparation.ts';
 import type { ExperiencePreparation } from './experience-preparation.ts';
 import { selectSummaryCandidates } from './session-summary.ts';
@@ -36,7 +36,7 @@ const vaultRoot = process.env.AI_TODOS_VAULT_ROOT ? resolve(process.env.AI_TODOS
 const experiencePreparations = new ExperiencePreparations(store, async (sourceId, options) => {
   if (!vaultRoot) throw new Error('请配置 AI_TODOS_VAULT_ROOT 后再准备沉淀会话');
   return (await prepareExperienceChat(store, sourceId, wikiRoot, vaultRoot, options)).chat;
-});
+}, (chat, options) => startExperienceExtraction(store, chat, options));
 function wiki() {
   // 首次访问时恢复中断的写入，恢复失败时不缓存不可用的连接。
   if (!wikiStore) {
@@ -164,16 +164,25 @@ async function wikiAction(raw: unknown, owner: string) {
   if (input.operation === 'archive_session') return store.confirmSession(input.confirmation);
   if (input.operation === 'prepare_capture') {
     if (!vaultRoot) throw new Error('请配置 AI_TODOS_VAULT_ROOT 后再准备沉淀会话');
-    return experiencePreparations.start(input.sessionId);
+    const preference = store.meta<{ revision: number; selection: WikiModelSelection | null }>('experience.modelPreference', { revision: 0, selection: null });
+    if (!preference.selection) throw new Error('请先在设置中保存沉淀默认模型');
+    return experiencePreparations.start(input.sessionId, preference.selection);
   }
   if (input.operation === 'ack_capture') return experiencePreparations.acknowledge(input.sessionId, input.jobId);
   if (input.operation === 'open_capture') {
     if (!vaultRoot) throw new Error('请配置 AI_TODOS_VAULT_ROOT 后再打开沉淀会话');
     const job = store.meta<ExperiencePreparation | null>(`experience.preparation.${input.sessionId}`, null);
-    if (job && job.status !== 'ready') throw new Error(job.error || '沉淀会话还在后台准备，请稍后进入');
+    if (job && job.status !== 'ready' && !(job.status === 'failed' && job.stage === 'extracting')) throw new Error(job.error || '沉淀会话还在后台准备，请稍后进入');
     return openExperienceChat(store, input.sessionId, wikiRoot, vaultRoot);
   }
-  if (input.operation === 'models') return { models: await listWikiModels(), preference: wiki().modelPreference() };
+  if (input.operation === 'models') return { models: await listWikiModels(), preference: wiki().modelPreference(), capturePreference: store.meta('experience.modelPreference', { revision: 0, selection: null }) };
+  if (input.operation === 'set_capture_model') {
+    // 验证账户当前支持的模型，再检查版本，防止慢目录查询覆盖另一窗口已保存的选择。
+    const selection = validateWikiModel(await listWikiModels(), input.modelSelection);
+    const current = store.meta('experience.modelPreference', { revision: 0, selection: null });
+    if (current.revision !== input.revision) throw Object.assign(new Error('默认模型设置已变化，请刷新后重试'), { status: 409 });
+    return { capturePreference: store.setMeta('experience.modelPreference', { revision: current.revision + 1, selection }) };
+  }
 
   // 读取与生成仅允许指向已观察或宿主同步的会话。
   if (input.operation === 'list' || input.operation === 'generate' || input.operation === 'start' || input.operation === 'progress' || input.operation === 'cancel') {
@@ -273,7 +282,7 @@ const server = createServer(async (req, res) => {
     if (path === '/health' && req.method === 'GET') return send(res, 200, { name: 'ai-todos', version: pkg.version });
     if (path.startsWith('/internal/')) {
       if (!same(req.headers.authorization, `Bearer ${token}`)) return send(res, 401, errorPayload(new DomainError('errors.unauthorized')));
-      if (path === '/internal/ping') return send(res, 200, { ok: true, wikiUiRevision: 8 });
+      if (path === '/internal/ping') return send(res, 200, { ok: true, wikiUiRevision: 9 });
       if (path === '/internal/state') return send(res, 200, store.snapshot());
       if (path === '/internal/task' && req.method === 'POST') {
         const input = await body(req); return send(res, 200, { task: store.get('task', input.id), history: store.taskHistory(input.id) });

@@ -13,7 +13,7 @@ export function ExperienceReadyNotice({ title, busy, onOpen, onLater }: { title:
       <Dialog.Title>{t('wiki.captureReadyTitle')}</Dialog.Title>
       <p className="experience-ready-notice__source">{title}</p>
       <Dialog.Description className="experience-ready-notice__description">{t('wiki.captureReadyDescription')}</Dialog.Description>
-      <div className="experience-ready-notice__actions"><button type="button" className="quiet" disabled={busy} onClick={onLater}>{t('wiki.captureLater')}</button><button type="button" disabled={busy} onClick={onOpen}><ArrowUpRight size={15} />{t('wiki.enterCapture')}</button></div>
+      <div className="experience-ready-notice__actions"><button type="button" className="quiet" disabled={busy} onClick={onLater}>{t('wiki.captureLater')}</button><button type="button" disabled={busy} onClick={onOpen}><ArrowUpRight size={15} />{t('wiki.reviewCapture')}</button></div>
     </Dialog.Content>
   </Dialog.Portal></Dialog.Root>;
 }

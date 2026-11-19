@@ -83,3 +83,50 @@ test('shutdown cannot report ready when a dependency resolves after cancellation
   assert.equal(store.sessions()[0].experiencePreparation.status, 'failed');
   assert.equal(store.sessions()[0].experiencePreparation.unread, false);
 });
+
+test('automatic capture is not ready until native extraction completes and pins the chosen default', async t => {
+  const { store, sourceId, chat } = fixture(t);
+  let finish, calls = 0;
+  const selected = { model: 'test-model', reasoningEffort: 'high' };
+  const manager = new ExperiencePreparations(store, async () => chat, async (_chat, options) => {
+    calls++; assert.deepEqual(options.modelSelection, selected);
+    await new Promise(resolve => { finish = resolve; });
+  });
+  manager.start(sourceId, selected);
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(store.sessions()[0].experiencePreparation.stage, 'extracting');
+  assert.equal(store.sessions()[0].experiencePreparation.status, 'preparing');
+  assert.equal(manager.start(sourceId, {model:'other', reasoningEffort:null}).job.modelSelection.model,'test-model');
+  finish(); await settled(store, sourceId);
+  assert.equal(store.sessions()[0].experiencePreparation.unread,true);
+  assert.equal(calls,1); await manager.stop();
+});
+
+test('restart during extraction never misreports an existing prepared chat as completed', async t => {
+  const { store, sourceId, chat } = fixture(t);
+  store.registerExperienceChat(chat);
+  store.setMeta(`experience.preparation.${sourceId}`, { id: randomUUID(), sourceId, status:'preparing', stage:'extracting', createdAt:store.at(),updatedAt:store.at(),unread:false,retryAllowed:true,timings:{},checkpoint:chat,modelSelection:{model:'test',reasoningEffort:null} });
+  store.setMeta(`experience.initial.${chat.threadId}`, {status:'running'});
+  const manager = new ExperiencePreparations(store, async () => chat, async () => assert.fail('不得重发'));
+  assert.equal(store.sessions()[0].experiencePreparation.status,'failed');
+  assert.equal(store.sessions()[0].experiencePreparation.retryAllowed,false);
+  await manager.stop();
+});
+
+test('restart after seeding an automatic capture does not claim extraction is complete', async t => {
+  const {store,sourceId,chat}=fixture(t);store.registerExperienceChat(chat);
+  store.setMeta(`experience.preparation.${sourceId}`,{id:randomUUID(),sourceId,status:'preparing',stage:'seeding',createdAt:store.at(),updatedAt:store.at(),unread:false,retryAllowed:true,timings:{},checkpoint:chat,modelSelection:{model:'test',reasoningEffort:null}});
+  const manager=new ExperiencePreparations(store,async()=>chat,async()=>{});
+  assert.equal(store.sessions()[0].experiencePreparation.status,'failed');
+  assert.equal(store.sessions()[0].experiencePreparation.unread,false);
+  assert.equal(store.sessions()[0].experiencePreparation.retryAllowed,true);
+  await manager.stop();
+});
+
+test('reusing an already started native conversation does not announce a fresh extraction result', async t => {
+  const {store,sourceId,chat}=fixture(t);
+  const manager=new ExperiencePreparations(store,async()=>chat,async()=> 'reused');
+  manager.start(sourceId,{model:'test',reasoningEffort:null});const result=await settled(store,sourceId);
+  assert.equal(result.status,'ready');assert.equal(result.unread,false);
+  await manager.stop();
+});

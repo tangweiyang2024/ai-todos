@@ -37,7 +37,7 @@ export interface TimeRecord { id: string; taskId: string; endedAt: string; durat
 export type Settings = z.output<typeof settingsSchema> & { revision: number };
 export interface Notice { id: string; key: string; title: string; taskId: string | null; createdAt: string; read: boolean }
 export interface TaskEvent { id: string; at: string; type: string; revision?: number; state?: TaskState; sessionId?: string | null; delivery?: Delivery; decision?: Review['decision']; reviewer?: string; note?: string; reviewedRevision?: number; durationMs?: number }
-export interface Snapshot { tasks: Task[]; projects: Project[]; objectives: Objective[]; keyResults: KeyResult[]; plans: Plan[]; inbox: InboxItem[]; sessions: LiveSession[]; focus: Focus & { totalMs: number }; settings: Settings; notices: Notice[]; timeRecords: TimeRecord[]; serverTime: string; csrf?: string }
+export interface Snapshot { tasks: Task[]; projects: Project[]; objectives: Objective[]; keyResults: KeyResult[]; plans: Plan[]; inbox: InboxItem[]; sessions: LiveSession[]; focus: Focus & { totalMs: number }; settings: Settings; captureModelPreference?: { revision: number; selection: import('./wiki-models.ts').WikiModelSelection | null }; notices: Notice[]; timeRecords: TimeRecord[]; serverTime: string; csrf?: string }
 export interface CodexProject { projectId: string; workspacePath: string; title: string }
 export interface CodexThread { id: string; title: string; preview?: string; cwd: string; projectId?: string | null; createdAt?: string; updatedAt: string; state: string; observation?: Pick<Session, 'observedAt' | 'event' | 'source' | 'turnId' | 'experienceStartedAt'> }
 export interface ServiceRuntime { pid: number; origin: string; token: string }

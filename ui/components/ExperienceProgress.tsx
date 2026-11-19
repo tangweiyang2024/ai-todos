@@ -10,6 +10,7 @@ export function ExperienceProgress({ value, preparation }: { value?: Progress; p
   if (preparation && preparation.status !== 'ready') return <div className={`experience-progress is-${preparation.status}`} role="status">
     <span className="experience-progress__status">{preparation.status === 'preparing' && <LoaderCircle size={12} className="experience-spinner" aria-hidden="true" />}{t(preparation.status === 'preparing' ? 'wiki.captureInBackground' : 'wiki.capturePreparationFailed')}</span>
     <span className="experience-progress__stage">{t(`wiki.capturePreparationStage.${preparation.stage}`)}</span>
+    {preparation.modelSelection && <span className="experience-progress__stage">{preparation.modelSelection.model}{preparation.modelSelection.reasoningEffort ? ` · ${preparation.modelSelection.reasoningEffort}` : ''}</span>}
     <span className="experience-progress__summary">{preparation.error || t('wiki.captureBackgroundHint')}</span>
   </div>;
 

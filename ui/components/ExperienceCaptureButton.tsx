@@ -7,8 +7,8 @@ export function ExperienceCaptureButton({ session, busy, onClick }: { session?: 
   const { t } = useTranslation();
   const job = session?.experiencePreparation;
   const preparing = job?.status === 'preparing';
-  const blocked = job?.status === 'failed' && !job.retryAllowed;
-  const label = preparing ? 'wiki.captureInBackground' : blocked ? 'wiki.captureCheckNeeded' : job?.status === 'failed' ? 'wiki.retryCapture' : job?.status === 'ready' && session?.experience?.status === 'ready' ? 'wiki.enterCapture' : session?.experience ? 'wiki.continueCapture' : 'wiki.title';
+  const blocked = job?.status === 'failed' && !job.retryAllowed && job.stage !== 'extracting';
+  const label = preparing ? 'wiki.captureInBackground' : blocked ? 'wiki.captureCheckNeeded' : job?.status === 'failed' ? job.retryAllowed ? 'wiki.retryCapture' : 'wiki.captureInspect' : job?.status === 'ready' && job.unread ? 'wiki.reviewCapture' : session?.experience ? 'wiki.continueCapture' : 'wiki.title';
   return <button type="button" disabled={busy || preparing || blocked} onClick={onClick} title={job?.error}>
     {preparing ? <LoaderCircle size={12} className="experience-spinner" aria-hidden="true" /> : <Sparkles size={12} aria-hidden="true" />}{t(label)}
   </button>;

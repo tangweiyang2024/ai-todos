@@ -1,3 +1,4 @@
+import { CaptureModelSettings } from './components/CaptureModelSettings.tsx';
 import { mergeTaskUpdates } from './task-updates.ts';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { i18n, getLocale, applyHostLocale, getLanguagePreference, setLanguagePreference, languages, localizedError } from './i18n.ts';
@@ -260,7 +261,13 @@ function Workspace() {
     const preparation = session?.experiencePreparation;
     if (preparation?.status === 'preparing') return;
     // 首次点击只接受后台准备，面板无需等待原文读取和会话创建。
-    if (!session?.experience || preparation?.status === 'failed') {
+    const needsInitial = !session?.experience || session.experience.status === 'ready' && !preparation?.modelSelection;
+    const canRetry = preparation?.status === 'failed' && preparation.retryAllowed;
+    if (needsInitial || canRetry) {
+      if (!snapshotRef.current?.captureModelPreference?.selection) {
+        setView(current => ({ ...current, page: 'settings' }));
+        toast(t('wiki.captureChooseDefault')); return;
+      }
       await api('wiki/prepare_capture', { sessionId: id });
       await refresh(true);
       toast(t('wiki.captureQueued'));
@@ -269,7 +276,7 @@ function Workspace() {
 
     // 就绪后由用户主动进入；打开失败时不消除未读提醒。
     const result = await api('wiki/open_capture', { sessionId: id }) as { prefilled: boolean };
-    if (preparation?.unread) await api('wiki/ack_capture', { sessionId: id, jobId: preparation.id });
+    if (preparation?.status === 'ready' && preparation.unread) await api('wiki/ack_capture', { sessionId: id, jobId: preparation.id });
     await refresh(true);
     toast(t(result.prefilled ? 'wiki.captureOpened' : 'wiki.captureContinued'));
   });
@@ -465,7 +472,7 @@ function Workspace() {
     }
   }
   // 多个完成提醒逐个处理；编辑或审核期间先保留未读，避免覆盖正在进行的操作。
-  const readyCapture = !modal && !batchSessions && !experienceSession ? snapshot.sessions.filter(session => session.experiencePreparation?.status === 'ready' && session.experiencePreparation.unread).sort((a, b) => a.experiencePreparation!.updatedAt.localeCompare(b.experiencePreparation!.updatedAt))[0] : undefined;
+  const readyCapture = !modal && !batchSessions && !experienceSession ? snapshot.sessions.filter(session => session.experiencePreparation?.status === 'ready' && session.experiencePreparation.modelSelection && session.experiencePreparation.unread).sort((a, b) => a.experiencePreparation!.updatedAt.localeCompare(b.experiencePreparation!.updatedAt))[0] : undefined;
   return <><div className="workspace-shell"><aside className="workspace-sidebar">
     <div className="workspace-brand"><span>a</span> ai-todos</div>
     <div className="workspace-sidebar__label">{t('workspace.label')}</div>
@@ -502,7 +509,7 @@ function Workspace() {
       return <article className="card" key={project.id}><div className="row spaced"><h2>{project.title}</h2><button className="small" disabled={busy} onClick={() => openEntity('project', project)}>{t("common.edit")}</button></div>{project.codex && <p className="project-path">Codex · {project.codex.workspacePath}</p>}<p className="muted">{project.description || t("project.noDescription")}</p><div className="progress-track"><span style={{ width: `${tasks.length ? accepted / tasks.length * 100 : 0}%` }} /></div><div className="row spaced"><span className="muted">{t("project.acceptedCount", { accepted: accepted, count: tasks.length })}</span><button className="small" onClick={() => setView(current => ({ ...current, page: 'work', project: project.id }))}>{t("project.viewTasks")}</button></div></article>;
     })}{!snapshot.projects.length && <div className="empty-state"><strong>{t("project.organize")}</strong><span>{t("project.sharedTasks")}</span></div>}</div>}
     {view.page === 'plans' && <div className="list"><p className="muted">{t("plan.description")}</p>{[...snapshot.plans].sort((left, right) => right.date.localeCompare(left.date)).map(plan => <article className="card" key={plan.id}><div className="row spaced"><div><span className="muted">{plan.date}</span><h2>{plan.title}</h2></div><button className="small" disabled={busy} onClick={() => openEntity('plan', plan)}>{t("plan.edit")}</button></div><p className="muted">{plan.note}</p><div className="list">{plan.taskIds.map(id => <div className="row spaced" key={id}><button className="quiet" onClick={() => openTask(id)}>{findTask(id)?.title || t("task.deleted")}</button><span className="execution-status">{t(labels[findTask(id)?.state ?? ''] || 'common.unknown')}</span></div>)}{!plan.taskIds.length && <span className="muted">{t("plan.emptyTasks")}</span>}</div></article>)}{!snapshot.plans.length && <div className="empty-state"><strong>{t("plan.emptyTitle")}</strong><span>{t("plan.emptyHint")}</span></div>}</div>}
-    {view.page === 'settings' && <div className="grid settings-grid"><section className="card"><h2>{t('settings.sessionAge')}</h2><form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); const days = Number(data.get('sessionMaxAgeDays')); if (!Number.isInteger(days) || days < 0 || days > 36500) return; const { revision, ...settings } = snapshot.settings; void run(() => mutate({ action: 'settings', revision, data: { ...settings, sessionMaxAgeDays: days } }), t('settings.sessionAgeSaved')); }}><label>{t('settings.sessionAgeDays')} <input name="sessionMaxAgeDays" type="number" min="0" max="36500" defaultValue={snapshot.settings.sessionMaxAgeDays ?? 0} key={snapshot.settings.sessionMaxAgeDays ?? 0} /></label> <button type="submit" disabled={busy}>{t('common.save')}</button></form><p className="note">{t('settings.sessionAgeHint')}</p></section><section className="card"><h2>{t('settings.language')}</h2><SelectField label={t('settings.language')} value={getLanguagePreference()} disabled={busy} onValueChange={value => { if (!setLanguagePreference(value as LanguagePreference)) toast(t('settings.languageStorageFailed')); }} groups={[{ options: [{ value: 'auto', label: t('settings.followSystem') }, ...Object.entries(languages).map(([value, { name }]) => ({ value, label: name }))] }]} /><p className="note">{t('settings.languageHint')}</p></section></div>}
+    {view.page === 'settings' && <div className="grid settings-grid"><CaptureModelSettings call={api} onSaved={async () => { await refresh(true); }} /><section className="card"><h2>{t('settings.sessionAge')}</h2><form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); const days = Number(data.get('sessionMaxAgeDays')); if (!Number.isInteger(days) || days < 0 || days > 36500) return; const { revision, ...settings } = snapshot.settings; void run(() => mutate({ action: 'settings', revision, data: { ...settings, sessionMaxAgeDays: days } }), t('settings.sessionAgeSaved')); }}><label>{t('settings.sessionAgeDays')} <input name="sessionMaxAgeDays" type="number" min="0" max="36500" defaultValue={snapshot.settings.sessionMaxAgeDays ?? 0} key={snapshot.settings.sessionMaxAgeDays ?? 0} /></label> <button type="submit" disabled={busy}>{t('common.save')}</button></form><p className="note">{t('settings.sessionAgeHint')}</p></section><section className="card"><h2>{t('settings.language')}</h2><SelectField label={t('settings.language')} value={getLanguagePreference()} disabled={busy} onValueChange={value => { if (!setLanguagePreference(value as LanguagePreference)) toast(t('settings.languageStorageFailed')); }} groups={[{ options: [{ value: 'auto', label: t('settings.followSystem') }, ...Object.entries(languages).map(([value, { name }]) => ({ value, label: name }))] }]} /><p className="note">{t('settings.languageHint')}</p></section></div>}
   </main></div>
 
     {experienceSession && <WikiExperience key={experienceSession} sessionId={experienceSession} initialRecordId={experienceRecord} initialRevision={experienceRevision} embedded={embedded} browserOrigin={localOrigin} call={api} onClose={() => setExperienceSession(null)} />}

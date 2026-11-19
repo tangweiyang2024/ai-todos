@@ -1,6 +1,8 @@
 import { prepareExperienceContext, writeExperienceTask } from './experience-chat.ts';
 import type { ExperienceChat } from './experience-chat.ts';
 import type { PreparationOptions } from './experience-preparation.ts';
+import { runExperienceExtraction } from './experience-native-run.ts';
+import { validateWikiModel } from './wiki-models.ts';
 import { extractWithNativeAgent } from './wiki-native-extract.ts';
 import type { NativeWikiCheckpoint } from './wiki-native-extract.ts';
 import type { ThreadItem } from './wiki-chunks.ts';
@@ -52,8 +54,9 @@ interface CodexConnection {
   request: (method: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
   notifications: (listener: (message: Notification) => void) => void;
 }
-async function withCodex<T>(action: (connection: CodexConnection) => T | Promise<T>, timeout: number, shared = false, signal?: AbortSignal, mode: 'restricted' | 'native-chat' = 'restricted'): Promise<T> {
-  const cwd = await mkdtemp(join(tmpdir(), 'ai-todos-codex-'));
+async function withCodex<T>(action: (connection: CodexConnection) => T | Promise<T>, timeout: number, shared = false, signal?: AbortSignal, mode: 'restricted' | 'native-chat' = 'restricted', workingRoot?: string): Promise<T> {
+  const temporary = await mkdtemp(join(tmpdir(), 'ai-todos-codex-'));
+  const cwd = workingRoot ?? temporary;
   const disabled = ['shell_tool', 'unified_exec', 'apps', 'plugins', 'hooks', 'multi_agent', 'multi_agent_v2', 'computer_use', 'browser_use', 'image_generation', 'view_image', 'skill_search', 'tool_suggest', 'code_mode_host'];
   // 普通沉淀聊天只用元数据接口创建，保留用户的工具配置；受限生成器仍沿用禁用策略。
   const args = shared ? ['app-server', 'proxy'] : mode === 'native-chat' ? ['app-server', '--stdio', '--disable', 'hooks'] : ['app-server', '--stdio', ...disabled.flatMap(name => ['--disable', name]), '-c', 'web_search="disabled"'];
@@ -124,7 +127,7 @@ async function withCodex<T>(action: (connection: CodexConnection) => T | Promise
         child.once('close', () => { clearTimeout(force); resolve(); });
       });
     }
-    await rm(cwd, { recursive: true, force: true });
+    await rm(temporary, { recursive: true, force: true });
   }
 }
 
@@ -443,6 +446,38 @@ export async function extractWikiExperience(store: Store, sessionId: string, roo
 }
 
 const preparingExperiences = new Map<string, Promise<{ chat: ExperienceChat; created: boolean }>>();
+
+/** 校验首轮配置与原会话状态后交给原生 CLI；已有实际轮次时仅复用，不追加消息。 */
+export async function startExperienceExtraction(store: Store, chat: ExperienceChat, options: PreparationOptions) {
+  // 已开始或已完成的会话禁止再次派发；本地开始记录也用于快速打开。
+  if (store.experienceChatHasStarted(chat.threadId)) return 'reused' as const;
+  if (!options.modelSelection) throw new Error('请先在设置中保存沉淀默认模型');
+  const selection = options.modelSelection;
+  const disabledMcpServers = await withCodex(async ({ request }) => {
+    const turns = await request('thread/turns/list', { threadId: chat.threadId, limit: 1, itemsView: 'notLoaded' });
+    if (z.array(z.unknown()).parse(turns.data).length) {
+      store.setMeta(`experience.started.${chat.threadId}`, true);
+      return null;
+    }
+    validateWikiModel(await readWikiModels(request), selection);
+
+    // 仅读取 MCP 名称，不读取配置和凭据；完整禁用首轮不需要的外部工具。
+    const names = new Set<string>(), cursors = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const page = mcpPageSchema.parse(await request('mcpServerStatus/list', { limit: 100, cursor, detail: 'toolsAndAuthOnly' }));
+      for (const server of page.data) names.add(server.name);
+      cursor = page.nextCursor;
+      if (cursor && cursors.has(cursor)) throw new Error('MCP 目录分页异常，未启动提取');
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    return [...names];
+  }, 30000, false, options.signal, 'restricted', chat.vaultRoot);
+  if (disabledMcpServers === null) return 'reused' as const;
+
+  // 原生执行自行维护工具和上下文；应用只记录开始、完成与失败。
+  return runExperienceExtraction(store, chat, selection, { signal: options.signal, disabledMcpServers });
+}
 
 /** 准备可复用的沉淀聊天；可回报阶段、复用断点和取消，但不打开窗口或启动推理。 */
 export async function prepareExperienceChat(store: Store, sourceId: string, wikiRoot: string, vaultRoot: string, options: PreparationOptions = {}) {

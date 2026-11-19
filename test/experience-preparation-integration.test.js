@@ -18,7 +18,11 @@ test('slow source preparation returns immediately, survives panel closure, and i
   writeFileSync(join(dir, 'codex'), `#!${process.execPath}
 import { createInterface } from 'node:readline';import { existsSync,appendFileSync } from 'node:fs';
 if(process.argv.includes('proxy'))process.exit(1);
+if(process.argv.includes('exec')){let input='';for await(const c of process.stdin)input+=c;appendFileSync(${JSON.stringify(join(dir, 'exec'))},JSON.stringify({args:process.argv.slice(2),input})+'\\n');console.log(JSON.stringify({type:'thread.started',thread_id:${JSON.stringify(threadId)}}));console.log(JSON.stringify({type:'turn.started'}));while(!existsSync(${JSON.stringify(join(dir,'analysis-released'))}))await new Promise(r=>setTimeout(r,20));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'fixture候选'}}));console.log(JSON.stringify({type:'turn.completed'}));process.exit(0);}
+
 createInterface({input:process.stdin}).on('line',async line=>{const m=JSON.parse(line);appendFileSync(${JSON.stringify(join(dir, 'rpc'))},line+'\\n');if(m.id===undefined)return;let r={};
+if(m.method==='model/list')r={data:[{id:'test',model:'test',displayName:'Test',supportedReasoningEfforts:[{reasoningEffort:'high',description:'High'}]}],nextCursor:null};
+if(m.method==='mcpServerStatus/list')r={data:[{name:'fixture'}],nextCursor:null};
 if(m.method==='thread/read')r={thread:{id:m.params.threadId}};
 if(m.method==='thread/items/list'){while(!existsSync(${JSON.stringify(released)}))await new Promise(r=>setTimeout(r,20));r={data:[{turnId:'source-turn',item:{id:'evidence',type:'agentMessage',text:'完整业务证据'}}],nextCursor:null};}
 if(m.method==='thread/start')r={thread:{id:${JSON.stringify(threadId)},preview:'',cwd:m.params.cwd,ephemeral:false,updatedAt:Math.floor(Date.now()/1000),status:{type:'idle'}}};
@@ -35,6 +39,13 @@ if(m.method==='thread/turns/list')r={data:[],nextCursor:null};console.log(JSON.s
   const get = () => fetch(origin + '/api/state', { headers: { cookie } }).then(r => r.json());
   const initial = await get(), headers = { cookie, origin, 'content-type': 'application/json', 'x-csrf-token': initial.csrf };
   const post = (operation, data = {}) => fetch(`${origin}/api/wiki/${operation}`, { method: 'POST', headers, body: JSON.stringify({ sessionId: sourceId, ...data }), signal: AbortSignal.timeout(operation === 'prepare_capture' ? 5000 : 10000) });
+  const configPost = data => fetch(origin+'/api/wiki/set_capture_model',{method:'POST',headers,body:JSON.stringify(data)});
+  assert.notEqual((await post('prepare_capture')).status,200,'没有默认模型不能自动运行');
+  assert.equal((await configPost({revision:0,modelSelection:{model:'missing',reasoningEffort:null}})).status,400);
+  assert.equal((await configPost({revision:0,modelSelection:{model:'test',reasoningEffort:'high'}})).status,200);
+  assert.equal((await configPost({revision:0,modelSelection:{model:'test',reasoningEffort:'high'}})).status,409);
+  const catalog=await (await fetch(origin+'/api/wiki/models',{method:'POST',headers,body:'{}'})).json();
+  assert.equal(catalog.capturePreference.selection.model,'test');
   const requestAt = performance.now(), response = await post('prepare_capture');
   assert.equal(response.status, 200, await response.clone().text());
   const first = await response.json(); assert.equal(first.job.status, 'preparing');
@@ -56,6 +67,10 @@ if(m.method==='thread/turns/list')r={data:[],nextCursor:null};console.log(JSON.s
   writeFileSync(join(dir, 'name-allowed'), 'yes');
   const retry = await (await post('prepare_capture')).json();
   assert.notEqual(retry.job.id, first.job.id);
+  for (let i = 0; i < 150; i++) { state = await get(); if (state.sessions[0].experiencePreparation.stage === 'extracting') break; await new Promise(r => setTimeout(r,30)); }
+  assert.equal(state.sessions[0].experiencePreparation.status,'preparing');
+  assert.equal(existsSync(opened),false);
+  writeFileSync(join(dir,'analysis-released'),'yes');
   for (let i = 0; i < 150; i++) { state = await get(); if (state.sessions[0].experiencePreparation.status === 'ready') break; await new Promise(r => setTimeout(r, 30)); }
   const job = state.sessions[0].experiencePreparation;
   assert.equal(job.status, 'ready'); assert.equal(job.unread, true); assert.equal(existsSync(opened), false);
@@ -69,5 +84,8 @@ if(m.method==='thread/turns/list')r={data:[],nextCursor:null};console.log(JSON.s
   assert.equal(calls.filter(c => c.method === 'thread/start').length, 1);
   assert.equal(calls.filter(c => c.method === 'thread/inject_items').length, 1);
   assert.ok(!calls.some(c => c.method === 'turn/start'));
+  const executions=readFileSync(join(dir,'exec'),'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(executions.length,1); assert.ok(executions[0].args.includes('test'));
+  assert.equal(new URL(readFileSync(opened,'utf8')).searchParams.has('prompt'),false);
   assert.equal(readFileSync(join(wiki, 'index.md'), 'utf8'), '# 测试索引\n');
 });

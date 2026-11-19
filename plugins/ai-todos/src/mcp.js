@@ -42530,6 +42530,13 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default3 = {
+  "wiki.reviewCapture": "Review extraction result",
+  "wiki.captureInspect": "Inspect conversation",
+  "wiki.captureChooseDefault": "Choose and save a default capture model, then return to the card to start.",
+  "wiki.captureModelSaved": "Default capture model saved",
+  "wiki.captureModelHint": "Use this model and reasoning effort to start extraction automatically. Changes apply to future captures only and do not change global Codex settings.",
+  "wiki.captureModelTitle": "Default capture model",
+  "wiki.capturePreparationStage.extracting": "Codex is extracting experience",
   "wiki.analysisModel": "Analysis model",
   "wiki.reasoningEffort": "Reasoning effort",
   "wiki.chooseModel": "Choose a model",
@@ -42553,21 +42560,21 @@ var en_default3 = {
   "wiki.localApprovalOpened": "The local review page was requested. If it did not open, visit:",
   "wiki.openApproval": "Open local approval",
   "wiki.capturePreparing": "Preparing the experience conversation and source\u2026",
-  "wiki.captureQueued": "Preparing in the background. You can keep working; we will notify you when it is ready.",
-  "wiki.captureInBackground": "Preparing in background",
-  "wiki.captureBackgroundHint": "Keep working. A notice will appear when the conversation is ready.",
-  "wiki.capturePreparationFailed": "Preparation incomplete",
+  "wiki.captureQueued": "Extraction started in the background. We will notify you when it finishes.",
+  "wiki.captureInBackground": "Extracting in background",
+  "wiki.captureBackgroundHint": "Codex is analyzing the source with your selected model. A notice appears when finished.",
+  "wiki.capturePreparationFailed": "Capture did not finish",
   "wiki.captureCheckNeeded": "Check creation result",
-  "wiki.retryCapture": "Retry preparation",
+  "wiki.retryCapture": "Retry extraction",
   "wiki.enterCapture": "Open experience conversation",
-  "wiki.captureReadyTitle": "Experience conversation is ready",
-  "wiki.captureReadyDescription": "Source material and instructions are ready. Open the conversation, choose a model and send the prepared prompt to begin.",
+  "wiki.captureReadyTitle": "Initial extraction finished",
+  "wiki.captureReadyDescription": "The result is already in the conversation. Open it to review; no need to send the first prompt. The Wiki has not been updated.",
   "wiki.captureLater": "Later",
   "wiki.capturePreparationStage.reading": "Reading source material",
   "wiki.capturePreparationStage.connecting": "Connecting to Codex",
   "wiki.capturePreparationStage.creating": "Creating conversation",
   "wiki.capturePreparationStage.seeding": "Preparing handoff prompt",
-  "wiki.capturePreparationStage.ready": "Ready",
+  "wiki.capturePreparationStage.ready": "Awaiting review",
   "wiki.captureContinued": "Opened the existing Codex experience conversation.",
   "wiki.captureOpened": "Opened the Codex experience conversation. Choose a model and send the prepared prompt there.",
   "wiki.continueCapture": "Continue experience",
@@ -43325,6 +43332,13 @@ var en_default3 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "wiki.reviewCapture": "\u67E5\u770B\u63D0\u53D6\u7ED3\u679C",
+  "wiki.captureInspect": "\u8FDB\u5165\u4F1A\u8BDD\u6838\u5BF9",
+  "wiki.captureChooseDefault": "\u8BF7\u5148\u9009\u62E9\u5E76\u4FDD\u5B58\u6C89\u6DC0\u9ED8\u8BA4\u6A21\u578B\uFF0C\u7136\u540E\u8FD4\u56DE\u5361\u7247\u5F00\u59CB\u63D0\u53D6\u3002",
+  "wiki.captureModelSaved": "\u6C89\u6DC0\u9ED8\u8BA4\u6A21\u578B\u5DF2\u4FDD\u5B58",
+  "wiki.captureModelHint": "\u4FDD\u5B58\u540E\uFF0C\u70B9\u51FB\u6C89\u6DC0\u7ECF\u9A8C\u5C06\u4F7F\u7528\u6B64\u6A21\u578B\u548C\u63A8\u7406\u5F3A\u5EA6\u81EA\u52A8\u542F\u52A8\u9996\u8F6E\u63D0\u53D6\u3002\u4FEE\u6539\u53EA\u5F71\u54CD\u540E\u7EED\u4EFB\u52A1\uFF0C\u4E0D\u6539\u53D8 Codex \u5168\u5C40\u8BBE\u7F6E\u3002",
+  "wiki.captureModelTitle": "\u6C89\u6DC0\u9ED8\u8BA4\u6A21\u578B",
+  "wiki.capturePreparationStage.extracting": "Codex \u6B63\u5728\u63D0\u53D6\u7ECF\u9A8C",
   "wiki.analysisModel": "\u5206\u6790\u6A21\u578B",
   "wiki.reasoningEffort": "\u63A8\u7406\u5F3A\u5EA6",
   "wiki.chooseModel": "\u8BF7\u9009\u62E9\u6A21\u578B",
@@ -43348,21 +43362,21 @@ var zh_CN_default2 = {
   "wiki.localApprovalOpened": "\u5DF2\u8BF7\u6C42\u6253\u5F00\u672C\u5730\u5BA1\u6838\u9875\u9762\uFF1B\u5982\u672A\u663E\u793A\uFF0C\u8BF7\u624B\u52A8\u8BBF\u95EE\uFF1A",
   "wiki.openApproval": "\u6253\u5F00\u672C\u5730\u9875\u9762\u6279\u51C6",
   "wiki.capturePreparing": "\u6B63\u5728\u51C6\u5907\u6C89\u6DC0\u4F1A\u8BDD\u4E0E\u539F\u6587\u8D44\u6599\u2026",
-  "wiki.captureQueued": "\u5DF2\u5728\u540E\u53F0\u51C6\u5907\uFF0C\u5B8C\u6210\u540E\u4F1A\u63D0\u9192\u4F60\uFF0C\u53EF\u7EE7\u7EED\u5904\u7406\u5176\u4ED6\u5DE5\u4F5C\u3002",
-  "wiki.captureInBackground": "\u540E\u53F0\u51C6\u5907\u4E2D",
-  "wiki.captureBackgroundHint": "\u53EF\u7EE7\u7EED\u5904\u7406\u5176\u4ED6\u5DE5\u4F5C\uFF0C\u51C6\u5907\u5B8C\u6210\u540E\u4F1A\u5F39\u7A97\u63D0\u9192\u3002",
-  "wiki.capturePreparationFailed": "\u6C89\u6DC0\u51C6\u5907\u672A\u5B8C\u6210",
+  "wiki.captureQueued": "\u5DF2\u5728\u540E\u53F0\u5F00\u59CB\u63D0\u53D6\uFF0C\u5B8C\u6210\u540E\u4F1A\u63D0\u9192\u4F60\uFF0C\u53EF\u7EE7\u7EED\u5904\u7406\u5176\u4ED6\u5DE5\u4F5C\u3002",
+  "wiki.captureInBackground": "\u540E\u53F0\u63D0\u53D6\u4E2D",
+  "wiki.captureBackgroundHint": "\u6B63\u5728\u4F7F\u7528\u6240\u9009\u6A21\u578B\u5206\u6790\u539F\u6587\uFF0C\u7ED3\u675F\u540E\u4F1A\u5F39\u7A97\u63D0\u9192\u3002",
+  "wiki.capturePreparationFailed": "\u6C89\u6DC0\u672A\u5B8C\u6210",
   "wiki.captureCheckNeeded": "\u521B\u5EFA\u7ED3\u679C\u5F85\u6838\u5BF9",
-  "wiki.retryCapture": "\u91CD\u8BD5\u51C6\u5907",
+  "wiki.retryCapture": "\u91CD\u8BD5\u63D0\u53D6",
   "wiki.enterCapture": "\u8FDB\u5165\u6C89\u6DC0\u4F1A\u8BDD",
-  "wiki.captureReadyTitle": "\u6C89\u6DC0\u4F1A\u8BDD\u5DF2\u5C31\u7EEA",
-  "wiki.captureReadyDescription": "\u539F\u6587\u8D44\u6599\u548C\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907\u597D\u3002\u8FDB\u5165\u4F1A\u8BDD\u540E\u9009\u62E9\u6A21\u578B\u5E76\u53D1\u9001\uFF0C\u5373\u53EF\u5F00\u59CB\u6C89\u6DC0\u3002",
+  "wiki.captureReadyTitle": "\u9996\u8F6E\u63D0\u53D6\u5DF2\u7ED3\u675F",
+  "wiki.captureReadyDescription": "\u7ED3\u679C\u5DF2\u5728\u6C89\u6DC0\u4F1A\u8BDD\u4E2D\u5C55\u793A\uFF0C\u8FDB\u5165\u5373\u53EF\u5BA1\u6838\uFF0C\u65E0\u9700\u518D\u53D1\u9001\u9996\u6761\u63D0\u793A\u8BCD\u3002\u6B63\u5F0F Wiki \u5C1A\u672A\u5199\u5165\u3002",
   "wiki.captureLater": "\u7A0D\u540E",
   "wiki.capturePreparationStage.reading": "\u8BFB\u53D6\u539F\u6587\u8D44\u6599",
   "wiki.capturePreparationStage.connecting": "\u8FDE\u63A5 Codex",
   "wiki.capturePreparationStage.creating": "\u521B\u5EFA\u6C89\u6DC0\u4F1A\u8BDD",
   "wiki.capturePreparationStage.seeding": "\u51C6\u5907\u4EA4\u63A5\u63D0\u793A\u8BCD",
-  "wiki.capturePreparationStage.ready": "\u51C6\u5907\u5C31\u7EEA",
+  "wiki.capturePreparationStage.ready": "\u7B49\u5F85\u5BA1\u6838",
   "wiki.captureContinued": "\u5DF2\u6253\u5F00\u539F\u6765\u7684 Codex \u6C89\u6DC0\u4F1A\u8BDD\u3002",
   "wiki.captureOpened": "\u5DF2\u6253\u5F00 Codex \u6C89\u6DC0\u4F1A\u8BDD\uFF1B\u63D0\u793A\u8BCD\u5DF2\u51C6\u5907\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u9009\u62E9\u6A21\u578B\u5E76\u53D1\u9001\u3002",
   "wiki.continueCapture": "\u7EE7\u7EED\u6C89\u6DC0",
@@ -44291,6 +44305,7 @@ var prepareCapture = external_exports.object({ operation: external_exports.liter
 var ackCapture = external_exports.object({ operation: external_exports.literal("ack_capture"), sessionId: id2, jobId: id2 }).strict();
 var archiveSession = external_exports.object({ operation: external_exports.literal("archive_session"), confirmation: sessionConfirmSchema.extend({ archive: external_exports.literal(true) }) }).strict();
 var models = external_exports.object({ operation: external_exports.literal("models") }).strict();
+var captureModel = external_exports.object({ operation: external_exports.literal("set_capture_model"), revision: external_exports.number().int().nonnegative(), modelSelection: wikiModelSelectionSchema }).strict();
 var generate = external_exports.object({ operation: external_exports.literal("generate"), sessionId: id2, modelSelection: wikiModelSelectionSchema.optional() }).strict();
 var start = external_exports.object({ operation: external_exports.literal("start"), sessionId: id2, modelSelection: wikiModelSelectionSchema.optional() }).strict();
 var progress = external_exports.object({ operation: external_exports.literal("progress"), sessionId: id2 }).strict();
@@ -44301,11 +44316,11 @@ var preview = external_exports.object({ operation: external_exports.literal("pre
 var compare = external_exports.object({ operation: external_exports.literal("compare"), id: id2, revision: revision2, modelSelection: wikiModelSelectionSchema.optional() }).strict();
 var approve = external_exports.object({ operation: external_exports.literal("approve"), ticket: external_exports.string().regex(/^[a-f0-9]{48}$/) }).strict();
 var openReview = external_exports.object({ operation: external_exports.literal("open_review"), id: id2, revision: revision2 }).strict();
-var wikiActionSchema = external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, generate, start, progress, cancel, update, reject, compare, preview, approve]);
+var wikiActionSchema = external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, captureModel, generate, start, progress, cancel, update, reject, compare, preview, approve]);
 var wikiUiSchema = external_exports.object({
   uiSessionId: id2,
   bridgeRevision: external_exports.literal(1).optional(),
-  action: external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, generate, start, progress, cancel, update, reject, compare, preview, openReview])
+  action: external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, captureModel, generate, start, progress, cancel, update, reject, compare, preview, openReview])
 }).strict();
 var wikiBridgeSchema = external_exports.object({
   uiSessionId: id2,
@@ -44377,7 +44392,7 @@ async function connect() {
       const health = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(600) }).then((response2) => response2.json());
       const comparison = typeof health.version === "string" ? package_default.version.localeCompare(health.version, void 0, { numeric: true }) : -1;
       const revision3 = typeof capabilities.wikiUiRevision === "number" ? capabilities.wikiUiRevision : 0;
-      if (health.name === "ai-todos" && (comparison > 0 || comparison === 0 && revision3 < 8)) {
+      if (health.name === "ai-todos" && (comparison > 0 || comparison === 0 && revision3 < 9)) {
         const stopped = await fetch(`${origin}/internal/stop`, { method: "POST", headers: { authorization: `Bearer ${candidate.token}` }, signal: AbortSignal.timeout(1e3) });
         if (!stopped.ok) throw new Error("\u65E7\u670D\u52A1\u505C\u6B62\u5931\u8D25");
         return false;
