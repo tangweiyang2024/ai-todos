@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import pkg from '../package.json' with { type: 'json' };
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -10,7 +11,7 @@ test('older clients do not stop a compatible newer service', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'wiki-compat-')); let stops = 0;
   const server = createServer((req, res) => {
     res.setHeader('content-type', 'application/json');
-    if (req.url === '/health') return res.end(JSON.stringify({ name: 'ai-todos', version: '0.1.23' }));
+    if (req.url === '/health') return res.end(JSON.stringify({ name: 'ai-todos', version: pkg.version }));
     if (req.url === '/internal/ping') return res.end(JSON.stringify({ ok: true, wikiUiRevision: 11 }));
     if (req.url === '/internal/stop') { stops++; res.statusCode = 503; return res.end('{}'); }
     res.statusCode = 404; res.end('{}');

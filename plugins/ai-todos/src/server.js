@@ -30177,7 +30177,7 @@ var wikiBridgeSchema = external_exports.object({
 // package.json
 var package_default = {
   name: "ai-todos",
-  version: "0.1.23",
+  version: "0.1.24",
   private: true,
   type: "module",
   description: "Standalone local Codex productivity plugin",
