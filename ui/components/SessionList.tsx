@@ -1,5 +1,5 @@
-import { ExperienceProgress } from './ExperienceProgress.tsx';
-import { ExperienceCaptureButton } from './ExperienceCaptureButton.tsx';
+import { SessionCaptureProgress } from './ExperienceProgress.tsx';
+import { ExperienceCaptureButton, type CaptureActionHandler } from './ExperienceCaptureButton.tsx';
 import { SessionSummary } from './SessionSummary.tsx';
 import { SessionProjectGroups } from './SessionProjectGroups.tsx';
 import { useState } from 'react';
@@ -12,7 +12,7 @@ import { canConfirmAiSession, executionColumnForSession, executionColumnForTask,
 import { groupSessionItems } from '../session-list.ts';
 
 interface Props extends Pick<TaskCallbacks, 'onOpenTask' | 'onOpenSession' | 'onConfirmSession' | 'onCompleteTask' | 'onReviewTask' | 'onOpenCodex'> {
-  tasks: Task[]; allTasks: Task[]; sessions: LiveSession[]; projects: Project[]; busy: boolean; onHistory: () => void; onExperience: (id: string) => void; onSummary: (id: string) => void; grouped: boolean; onBatchProject: (id: string) => void; onArchive: (session: LiveSession) => void;
+  tasks: Task[]; allTasks: Task[]; sessions: LiveSession[]; projects: Project[]; busy: boolean; onHistory: () => void; onExperience: CaptureActionHandler; onSummary: (id: string) => void; grouped: boolean; onBatchProject: (id: string) => void; onArchive: (session: LiveSession) => void;
 }
 /** 展示按运行状态分组的会话，并提供对应的人工操作入口。 */
 export function SessionList({ tasks, allTasks, sessions, projects, busy, onOpenTask, onOpenSession, onConfirmSession, onCompleteTask, onReviewTask, onOpenCodex, onHistory, onExperience, onSummary, grouped, onBatchProject, onArchive }: Props) {
@@ -40,12 +40,12 @@ export function SessionList({ tasks, allTasks, sessions, projects, busy, onOpenT
           {task && session?.archiveConfirmed && task.state !== 'accepted' && <small>{t('batch.taskNotAccepted')}</small>}
           {session ? <SessionSummary session={session} onGenerate={onSummary} /> : description && <p className="session-list__description">{description}</p>}
           <div className="session-list__meta"><span>{project}</span><span>·</span>{session && <><span>{t('batch.created')} {session.catalogCreatedAt ? fmt(session.catalogCreatedAt) : t('batch.unknownCreated')}</span><span>·</span></>}<span>{t('card.lastActivity', { at: fmt(item.at) })}</span>{completed && !historical && <><span>·</span><span>{t('session.confirmedAt', { at: fmt(task?.review?.at || session?.confirmedAt || item.at) })}</span></>}{session && !completed && <><span>·</span><span>{t(session.source === 'codex-hook' ? 'workspace.hook' : session.source === 'codex-rollout' ? 'workspace.historySource' : 'workspace.hostSource')}</span>{session.stateConfidence === 'last_observed' && <><span>·</span><span>{t('workspace.lastObservedAt', { at: fmt(session.observedAt) })}</span></>}</>}</div>
-          <ExperienceProgress value={session?.experience} preparation={session?.experiencePreparation} />
+          <SessionCaptureProgress session={session} />
         </div>
         <div className="session-list__actions">
           {session && <button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={13} />{t('session.open')}</button>}
           {task && !session && <button type="button" disabled={busy} onClick={() => onOpenTask(task.id)}>{t('task.open')}</button>}
-          {(session?.id || task?.sessionId) && <ExperienceCaptureButton session={session} busy={busy} onClick={() => onExperience(session?.id || task!.sessionId!)} />}
+          {(session?.id || task?.sessionId) && <ExperienceCaptureButton session={session} busy={busy} onClick={action => onExperience(session?.id || task!.sessionId!, action)} />}
           {canConfirm && <button type="button" className="session-list__primary" disabled={busy} onClick={() => onArchive(session)}>{t('session.confirm')}</button>}
           {session && !canConfirm && !completed && ['waiting_user', 'waiting_confirmation', 'unknown'].includes(task ? executionColumnForTask(task) : executionColumnForSession(session)) && <button type="button" disabled={busy} onClick={() => onArchive(session)}>{t('batch.archive')}</button>}
           {task && next?.action === 'complete' && <button type="button" className="session-list__primary" disabled={busy} onClick={() => onCompleteTask(task)}>{t('session.confirm')}</button>}

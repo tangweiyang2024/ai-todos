@@ -3,7 +3,7 @@ import { CheckCircle2, ArrowUpRight, X } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 
 /** 提醒后台准备已完成；用户选择进入或稍后，不自动切换 Codex 窗口。 */
-export function ExperienceReadyNotice({ title, busy, onOpen, onLater }: { title: string; busy: boolean; onOpen: () => void; onLater: () => void }) {
+export function ExperienceReadyNotice({ title, detail, description, busy, onOpen, onLater }: { title: string; description: string; detail?: string; busy: boolean; onOpen: () => void; onLater: () => void }) {
   const { t } = useTranslation();
   return <Dialog.Root open onOpenChange={open => { if (!open && !busy) onLater(); }}><Dialog.Portal>
     <Dialog.Overlay className="task-editor-backdrop" />
@@ -12,7 +12,8 @@ export function ExperienceReadyNotice({ title, busy, onOpen, onLater }: { title:
       <div className="experience-ready-notice__icon"><CheckCircle2 size={26} aria-hidden="true" /></div>
       <Dialog.Title>{t('wiki.captureReadyTitle')}</Dialog.Title>
       <p className="experience-ready-notice__source">{title}</p>
-      <Dialog.Description className="experience-ready-notice__description">{t('wiki.captureReadyDescription')}</Dialog.Description>
+      {detail && <p className="capture-notice-detail">{detail}</p>}
+      <Dialog.Description className="experience-ready-notice__description">{description}</Dialog.Description>
       <div className="experience-ready-notice__actions"><button type="button" className="quiet" disabled={busy} onClick={onLater}>{t('wiki.captureLater')}</button><button type="button" disabled={busy} onClick={onOpen}><ArrowUpRight size={15} />{t('wiki.reviewCapture')}</button></div>
     </Dialog.Content>
   </Dialog.Portal></Dialog.Root>;

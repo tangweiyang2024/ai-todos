@@ -46,3 +46,18 @@ test('capture instructions resolve local rules and distinguish the main ingest w
  assert.ok(prompt.indexOf('先读取本机规范')<prompt.indexOf('提取候选'));
  assert.ok(prompt.includes('wiki/chats/code/'));
 });
+
+test('candidate instructions retain undocumented operator knowledge and separate reported policy from an observed outcome', t => {
+  const root = mkdtempSync(join(tmpdir(), 'experience-maintainer-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const sourceId = randomUUID();
+  const context = prepareExperienceContext(root, sourceId, [{ turnId: 't', item: { id: 'i', type: 'userMessage', text: '我当面问过维护人' } }]);
+  const chat = writeExperienceTask({
+    ...context, sourceId, threadId: randomUUID(), createdAt: new Date().toISOString(), title: '权限说明',
+    wikiRoot: join(root, 'wiki'), vaultRoot: root, ingestSkill: '/skills/ingest',
+  });
+  const instructions = readFileSync(chat.contextPath, 'utf8');
+  for (const term of ['维护人 IM', '当面沟通', '准确角色名', '工单类型', '生效', '用户转述', '确认时间', '实际验证时间', '整理时间', 'last_verified', '本次会话无值得沉淀的复用知识']) {
+    assert.ok(instructions.includes(term), term);
+  }
+});

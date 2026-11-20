@@ -1,5 +1,5 @@
-import { ExperienceProgress } from './ExperienceProgress.tsx';
-import { ExperienceCaptureButton } from './ExperienceCaptureButton.tsx';
+import { SessionCaptureProgress } from './ExperienceProgress.tsx';
+import { ExperienceCaptureButton, type CaptureActionHandler } from './ExperienceCaptureButton.tsx';
 import { SessionSummary } from './SessionSummary.tsx';
 import { SessionProjectGroups } from './SessionProjectGroups.tsx';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +26,7 @@ export function AiBadge({ task }: { task: Pick<Task, 'ai' | 'sessionId'> }) {
   </span>;
 }
 
-interface ExecutionCardProps extends Pick<TaskCallbacks, 'onOpenTask'>, Partial<Pick<TaskCallbacks, 'onOpenSession' | 'onReviewTask' | 'onOpenCodex' | 'onCompleteTask'>> { onExperience?: (id: string) => void; onSummary?: (id: string) => void; onArchive?: (session: LiveSession) => void; task: Task; projects: Project[]; busy: boolean; onDragStart?: (event: DragEvent, task: Task) => void; onDragEnd?: () => void }
+interface ExecutionCardProps extends Pick<TaskCallbacks, 'onOpenTask'>, Partial<Pick<TaskCallbacks, 'onOpenSession' | 'onReviewTask' | 'onOpenCodex' | 'onCompleteTask'>> { onExperience?: CaptureActionHandler; onSummary?: (id: string) => void; onArchive?: (session: LiveSession) => void; task: Task; projects: Project[]; busy: boolean; onDragStart?: (event: DragEvent, task: Task) => void; onDragEnd?: () => void }
 
 /** 渲染任务在看板中的状态和可用操作。 */
 export function ExecutionCard({ task, projects, busy, onOpenTask, onOpenSession, onReviewTask, onOpenCodex, onCompleteTask, onExperience, onSummary, onArchive, onDragStart, onDragEnd }: ExecutionCardProps) {
@@ -52,11 +52,11 @@ export function ExecutionCard({ task, projects, busy, onOpenTask, onOpenSession,
     {task.ai ? <SessionSummary session={task.ai} onGenerate={onSummary} /> : task.description && <p className="execution-card__preview">{task.description}</p>}
     <small className="execution-card__activity">{t("card.lastActivity", { at: fmt(sessionLastActivity(task.ai, task.ai ? undefined : task.updatedAt)) })}</small>
     {task.ai?.stateConfidence === 'last_observed' && <small className="execution-card__activity">{t('workspace.lastObservedAt', { at: fmt(task.ai.observedAt) })}</small>}
-    <ExperienceProgress value={task.ai?.experience} preparation={task.ai?.experiencePreparation} />
+    <SessionCaptureProgress session={task.ai} />
     <div className="execution-card__primary execution-card__actions">
       <span className={`execution-status status-${column === 'completed' ? 'accepted' : task.state === 'awaiting_acceptance' ? task.state : task.ai ? runtimeState(task.ai.state) : task.state}`}>{attention && <CircleAlert size={14} aria-hidden="true" />}{status}</span>
       <div className="execution-card__buttons">
-        {task.sessionId && onExperience && <ExperienceCaptureButton session={task.ai} busy={busy} onClick={() => onExperience(task.sessionId!)} />}
+        {task.sessionId && onExperience && <ExperienceCaptureButton session={task.ai} busy={busy} onClick={action => onExperience(task.sessionId!, action)} />}
         {next?.action === 'complete' && task.sessionId && onOpenCodex && <button type="button" disabled={busy} onClick={() => onOpenCodex(task)}><ExternalLink size={12} />{t("session.open")}</button>}
         {next?.action === 'start' && onCompleteTask && <button type="button" disabled={busy} onClick={() => onCompleteTask(task)}><Check size={12} />{t("session.confirm")}</button>}
         {task.ai && ['waiting_user', 'waiting_confirmation', 'unknown'].includes(column) && onArchive && <button type="button" disabled={busy} onClick={() => onArchive(task.ai!)}>{t('batch.archive')}</button>}
@@ -77,7 +77,7 @@ export function ExecutionCard({ task, projects, busy, onOpenTask, onOpenSession,
   </article>;
 }
 
-interface SessionCardProps extends Pick<TaskCallbacks, 'onOpenSession' | 'onConfirmSession'> { session: LiveSession; tasks: Task[]; projects: Project[]; busy: boolean; onExperience?: (id: string) => void; onSummary?: (id: string) => void; onArchive?: (session: LiveSession) => void; onDragStart?: (event: DragEvent, session: LiveSession) => void; onDragEnd?: () => void }
+interface SessionCardProps extends Pick<TaskCallbacks, 'onOpenSession' | 'onConfirmSession'> { session: LiveSession; tasks: Task[]; projects: Project[]; busy: boolean; onExperience?: CaptureActionHandler; onSummary?: (id: string) => void; onArchive?: (session: LiveSession) => void; onDragStart?: (event: DragEvent, session: LiveSession) => void; onDragEnd?: () => void }
 // 展示独立会话的观察状态和人工操作。
 function SessionCard({ session, tasks, projects, busy, onOpenSession, onConfirmSession, onExperience, onSummary, onArchive, onDragStart, onDragEnd }: SessionCardProps) {
   const { t } = useTranslation();
@@ -93,8 +93,8 @@ function SessionCard({ session, tasks, projects, busy, onOpenSession, onConfirmS
     <SessionSummary session={session} onGenerate={onSummary} />
     <small className="execution-card__activity">{t("batch.created")} {session.catalogCreatedAt ? fmt(session.catalogCreatedAt) : t("batch.unknownCreated")} · {t("card.lastActivity", { at: fmt(sessionLastActivity(session)) })}</small>
     {session.stateConfidence === 'last_observed' && <small className="execution-card__activity">{t('workspace.lastObservedAt', { at: fmt(session.observedAt) })}</small>}
-    <ExperienceProgress value={session.experience} preparation={session.experiencePreparation} />
-    <div className="execution-card__primary execution-card__actions"><span className={`execution-status status-${completed ? 'accepted' : runtimeState(session.state)}`}>{attention && <CircleAlert size={14} aria-hidden="true" />}{isHistoricalSession(session) ? t("session.historicalCompleted") : completed ? t("board.completed") : sessionColumn(session) === 'waiting_confirmation' ? t("activity.pending") : runtimeLabel(session)}</span><div className="execution-card__buttons"><button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={12} />{t("session.open")}</button>{onExperience && <ExperienceCaptureButton session={session} busy={busy} onClick={() => onExperience(session.id)} />}{canConfirm && onConfirmSession && <button type="button" disabled={busy} onClick={() => onArchive ? onArchive(session) : onConfirmSession(session)}><Check size={12} />{t("session.confirm")}</button>}{!canConfirm && !completed && ["waiting_user", "unknown"].includes(sessionColumn(session)) && onArchive && <button type="button" disabled={busy} onClick={() => onArchive(session)}><Check size={12} />{t("batch.archive")}</button>}</div></div>
+    <SessionCaptureProgress session={session} />
+    <div className="execution-card__primary execution-card__actions"><span className={`execution-status status-${completed ? 'accepted' : runtimeState(session.state)}`}>{attention && <CircleAlert size={14} aria-hidden="true" />}{isHistoricalSession(session) ? t("session.historicalCompleted") : completed ? t("board.completed") : sessionColumn(session) === 'waiting_confirmation' ? t("activity.pending") : runtimeLabel(session)}</span><div className="execution-card__buttons"><button type="button" disabled={busy} onClick={() => onOpenSession(session.id)}><ExternalLink size={12} />{t("session.open")}</button>{onExperience && <ExperienceCaptureButton session={session} busy={busy} onClick={action => onExperience(session.id, action)} />}{canConfirm && onConfirmSession && <button type="button" disabled={busy} onClick={() => onArchive ? onArchive(session) : onConfirmSession(session)}><Check size={12} />{t("session.confirm")}</button>}{!canConfirm && !completed && ["waiting_user", "unknown"].includes(sessionColumn(session)) && onArchive && <button type="button" disabled={busy} onClick={() => onArchive(session)}><Check size={12} />{t("batch.archive")}</button>}</div></div>
     <div id={`execution-session-${session.id}`} className="execution-card__content" hidden={!expanded}><div className="execution-card__body">
       <div className="execution-card__topline"><span className="execution-session-card__source" title={session.cwd}><Code2 size={11} aria-hidden="true" /><span>Codex{workspace ? ` · ${workspace}` : ''}</span></span><span>{fmt(session.catalogUpdatedAt || session.observedAt)}</span></div>
       {(session.confirmationHistory ?? (session.confirmedAt ? [{ at: session.confirmedAt }] : [])).map((entry, index) => <small key={`${entry.at}-${index}`}>{t("session.confirmedAt", { at: fmt(entry.at) })}</small>)}
@@ -103,7 +103,7 @@ function SessionCard({ session, tasks, projects, busy, onOpenSession, onConfirmS
 }
 
 /** 按任务状态和会话观察组织看板，保留人工确认与拖动语义。 */
-export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, busy, onOpenTask, onOpenSession, onConfirmSession, onReviewTask, onOpenCodex, onCompleteTask, onTransition, onError, onExperience, onSummary, grouped, onBatchProject, onArchive }: Omit<TaskCallbacks, 'onReschedule'> & { tasks: Task[]; allTasks?: Task[]; sessions?: LiveSession[]; projects: Project[]; busy: boolean; onError: (message: string) => void; onExperience: (id: string) => void; onSummary: (id: string) => void; grouped: boolean; onBatchProject: (id: string) => void; onArchive: (session: LiveSession) => void }) {
+export function BoardView({ tasks, allTasks = tasks, sessions = [], projects, busy, onOpenTask, onOpenSession, onConfirmSession, onReviewTask, onOpenCodex, onCompleteTask, onTransition, onError, onExperience, onSummary, grouped, onBatchProject, onArchive }: Omit<TaskCallbacks, 'onReschedule'> & { tasks: Task[]; allTasks?: Task[]; sessions?: LiveSession[]; projects: Project[]; busy: boolean; onError: (message: string) => void; onExperience: CaptureActionHandler; onSummary: (id: string) => void; grouped: boolean; onBatchProject: (id: string) => void; onArchive: (session: LiveSession) => void }) {
   const { t } = useTranslation();
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [showCompletedHistory, setShowCompletedHistory] = useState(false);

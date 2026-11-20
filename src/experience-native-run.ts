@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { writeFileSync, renameSync } from 'node:fs';
 import type { Store } from './domain.ts';
-import type { ExperienceChat } from './experience-chat.ts';
+import { noKnowledgeAnswer, type ExperienceChat } from './experience-chat.ts';
 import type { WikiModelSelection } from './wiki-models.ts';
 
 export interface InitialExtraction {
@@ -29,13 +29,14 @@ export async function runExperienceExtraction(store: Store, chat: ExperienceChat
     ...(selection.reasoningEffort ? ['-c', `model_reasoning_effort=${JSON.stringify(selection.reasoningEffort)}`] : []),
     ...(options.disabledMcpServers ?? []).flatMap(name => ['-c', `mcp_servers.${name}.enabled=false`]),
     chat.threadId, '-'];
-  const prompt = `请读取并遵循 ${JSON.stringify(chat.contextPath)}，执行首轮经验提取。先核对 Wiki 当前维护规范，再分批读取完整原文，说明会话做了什么，逐项给出有依据的经验和未验证事项。完成后在本会话展示结果并等待我审核。此轮不得写入任何文件、正式 Wiki、raw、索引、日志、manifest 或人读文档，也不得调用外部写入工具；进度由 ai-todos 记录，无需更新进度文件。不要因只读限制停在请求写入权限。后续用户审核批准后才在普通会话继续 ingest。`;
+  const prompt = `请读取并遵循 ${JSON.stringify(chat.contextPath)}，执行首轮经验提取。先核对 Wiki 当前维护规范，再分批读取完整原文，说明会话做了什么，逐项给出有依据的经验和未验证事项。有候选时在本会话展示并等待我审核；没有候选时仅回复“${noKnowledgeAnswer}”。此轮不得写入任何文件、正式 Wiki、raw、索引、日志、manifest 或人读文档，也不得调用外部写入工具；进度由 ai-todos 记录，无需更新进度文件。不要因只读限制停在请求写入权限。后续用户审核批准后才在普通会话继续 ingest。`;
   const child = spawn('codex', args, { cwd: chat.vaultRoot, stdio: ['pipe', 'pipe', 'pipe'] });
 
   // 等待真实完成事件和进程退出；只投影生命周期，不接管原生工具循环或存储完整模型输出。
   try {
-    await new Promise<void>((resolve, reject) => {
-      let buffer = '', stderr = '', matched = false, started = false, completed = false, answer = false, failure: Error | undefined;
+    const stage = await new Promise<'reviewing' | 'no_knowledge'>((resolve, reject) => {
+      let buffer = '', stderr = '', matched = false, started = false, completed = false, failure: Error | undefined;
+      let outcome: 'reviewing' | 'no_knowledge' | undefined;
       let force: ReturnType<typeof setTimeout> | undefined;
       const terminate = () => { force ??= setTimeout(() => child.kill('SIGKILL'), 2000); force.unref(); };
       const stop = (message: string) => { failure ??= new Error(message); child.kill('SIGTERM'); terminate(); };
@@ -62,7 +63,11 @@ export async function runExperienceExtraction(store: Store, chat: ExperienceChat
               matched = true;
             }
             if (event.type === 'turn.started' && matched) { started = true; update('running'); store.setMeta(`experience.started.${chat.threadId}`, true); }
-            if (event.type === 'item.completed' && event.item?.type === 'agent_message' && event.item.text?.trim()) answer = true;
+            // 仅在最终有效答复精确命中空结果约定时结束提取，进度中不保留原文。
+            if (started && !completed && event.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string') {
+              const text = event.item.text.trim();
+              if (text) outcome = text.replace(/[。.]$/, '') === noKnowledgeAnswer ? 'no_knowledge' : 'reviewing';
+            }
             if (event.type === 'turn.completed') completed = matched && started;
             if (event.type === 'turn.failed') { stop('Codex 首轮提取失败，请进入原会话查看具体原因。'); terminate(); }
           } catch { stop('Codex 返回了无法识别的事件，请进入原会话核对。'); terminate(); }
@@ -72,12 +77,12 @@ export async function runExperienceExtraction(store: Store, chat: ExperienceChat
         clearTimeout(deadline); if (force) clearTimeout(force);
         options.signal?.removeEventListener('abort', abort);
         if (failure) reject(failure);
-        else if (code !== 0 || !completed || !answer) {
+        else if (code !== 0 || !completed || !outcome) {
           // 只输出可定位的错误类别，避免把 CLI 日志中的个人路径、URL 或凭据回显到卡片。
           const reason = /config\.toml|invalid transport/.test(stderr) ? 'Codex 配置加载失败' : /no rollout found/.test(stderr) ? 'Codex 找不到已准备的会话记录' : /Unknown feature/.test(stderr) ? 'Codex CLI 不支持当前功能配置' : 'Codex 未返回完整的提取结果';
           reject(new Error(`${reason}，请进入原会话核对。`));
         }
-        else resolve();
+        else resolve(outcome);
       });
       if (options.signal?.aborted) { abort(); terminate(); }
       else child.stdin.end(prompt);
@@ -86,9 +91,10 @@ export async function runExperienceExtraction(store: Store, chat: ExperienceChat
     });
     options.signal?.throwIfAborted();
 
-    // 完成只代表候选已在原生会话展示，不代表入库；进度写入采用原子替换。
+    // 将真实结束的首轮结果原子写入卡片；只有包含候选的结果才进入审核。
     const temporary = `${chat.progressPath}.initial.tmp`;
-    writeFileSync(temporary, JSON.stringify({ version: 1, sourceId: chat.sourceId, threadId: chat.threadId, stage: 'reviewing', summary: '首轮提取已结束，请进入会话审核结果；尚未写入 Wiki。', updatedAt: store.at() }), { mode: 0o600 });
+    const summary = stage === 'no_knowledge' ? noKnowledgeAnswer : '首轮提取已结束，请进入会话审核结果；尚未写入 Wiki。';
+    writeFileSync(temporary, JSON.stringify({ version: 1, sourceId: chat.sourceId, threadId: chat.threadId, stage, summary, updatedAt: store.at() }), { mode: 0o600 });
     renameSync(temporary, chat.progressPath);
     update('completed');
   } catch (error) { update('failed'); throw error; }

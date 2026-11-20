@@ -19,7 +19,7 @@ async function connect() {
       // 只升级能力不足的服务，不能让旧客户端停止能力更高的新服务。
       const comparison = typeof health.version === 'string' ? pkg.version.localeCompare(health.version, undefined, { numeric: true }) : -1;
       const revision = typeof capabilities.wikiUiRevision === 'number' ? capabilities.wikiUiRevision : 0;
-      if (health.name === 'ai-todos' && (comparison > 0 || (comparison === 0 && revision < 9))) {
+      if (health.name === 'ai-todos' && (comparison > 0 || (comparison === 0 && revision < 10))) {
         const stopped = await fetch(`${origin}/internal/stop`, { method: 'POST', headers: { authorization: `Bearer ${candidate.token}` }, signal: AbortSignal.timeout(1000) });
         if (!stopped.ok) throw new Error('旧服务停止失败');
         return false;

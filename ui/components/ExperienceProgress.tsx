@@ -1,3 +1,5 @@
+import type { ExperienceRecordView, LiveSession } from '../../src/types.ts';
+import { getLocale } from '../i18n.ts';
 import { useTranslation } from 'react-i18next';
 import { LoaderCircle, Sparkles } from 'lucide-react';
 import type { ExperienceProgress as Progress } from '../../src/experience-chat.ts';
@@ -15,10 +17,34 @@ export function ExperienceProgress({ value, preparation }: { value?: Progress; p
   </div>;
 
   // 准备完成后沿用原生会话观察和主动回报，不把“就绪”当作入库完成。
-  if (!value) return null;
+  if (!value) return preparation?.status === 'ready' ? <small>{t('wiki.capturePreparationStage.ready')}</small> : null;
   return <div className={`experience-progress is-${value.status}`} title={`${t('wiki.captureProgressHint')} · ${new Date(value.updatedAt).toLocaleString()}`}>
     <span className="experience-progress__status"><Sparkles size={12} aria-hidden="true" />{t(`wiki.captureStatus.${value.status}`)}</span>
     {value.stage && !['ready', 'completed', 'no_knowledge', 'failed'].includes(value.stage) && <span className="experience-progress__stage">{t(`wiki.captureStage.${value.stage}`)}</span>}
     {value.summary && <span className="experience-progress__summary">{value.summary}</span>}
   </div>;
+}
+
+/** 用当前界面语言显示完整日期和时间，以区分同日连续发起的记录。 */
+export function captureDate(at: string) {
+  return new Date(at).toLocaleString(getLocale());
+}
+
+/** 展示该次发起时间、可核对的范围及用户指定的重点。 */
+export function CaptureRecordMeta({ record }: { record: ExperienceRecordView }) {
+  const { t } = useTranslation();
+  return <div className="capture-record-meta">
+    <strong>{t('wiki.captureStartedAt', { at: captureDate(record.createdAt) })}</strong>
+    {record.focus && <span title={record.focus}>{record.focus}</span>}
+    <small>{record.sourceCapturedAt ? t('wiki.captureScopeAt', { at: captureDate(record.sourceCapturedAt) }) : t('wiki.captureScopeUnknown')}</small>
+  </div>;
+}
+
+/** 单条记录直接进入聊天，将可核对的记录信息放在卡片上。 */
+export function SessionCaptureProgress({ session }: { session?: LiveSession | null }) {
+  const onlyRecord = session?.experienceRecords?.length === 1 ? session.experienceRecords[0] : undefined;
+  return <>
+    {onlyRecord && <div className="capture-card-meta"><CaptureRecordMeta record={onlyRecord} /></div>}
+    <ExperienceProgress value={session?.experience} preparation={session?.experiencePreparation} />
+  </>;
 }

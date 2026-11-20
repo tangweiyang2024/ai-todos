@@ -1,18 +1,19 @@
 import { prepareExperienceContext, writeExperienceTask } from './experience-chat.ts';
 import type { ExperienceChat } from './experience-chat.ts';
-import type { PreparationOptions } from './experience-preparation.ts';
+import type { ExperienceSourceSnapshot, PreparationOptions } from './experience-preparation.ts';
 import { runExperienceExtraction } from './experience-native-run.ts';
 import { validateWikiModel } from './wiki-models.ts';
 import { extractWithNativeAgent } from './wiki-native-extract.ts';
 import type { NativeWikiCheckpoint } from './wiki-native-extract.ts';
 import type { ThreadItem } from './wiki-chunks.ts';
 import { execFile, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readStableThreadItems } from './wiki-thread-reader.ts';
 import { summaryTranscript } from './session-summary.ts';
 import { readWikiModels } from './wiki-models.ts';
 import type { WikiModelSelection } from './wiki-models.ts';
 import { createReadStream } from 'node:fs';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { homedir, tmpdir } from 'node:os';
@@ -479,71 +480,108 @@ export async function startExperienceExtraction(store: Store, chat: ExperienceCh
   return runExperienceExtraction(store, chat, selection, { signal: options.signal, disabledMcpServers });
 }
 
-/** 准备可复用的沉淀聊天；可回报阶段、复用断点和取消，但不打开窗口或启动推理。 */
+/** 为新提交固定原文；重试使用已保存的快照和采集时间。 */
+async function captureExperienceSource(store: Store, sourceId: string, options: PreparationOptions): Promise<ExperienceSourceSnapshot> {
+  // 从读取断点恢复时核对内容，避免把来源后续变化混入同一条记录。
+  const saved = options.sourceSnapshot;
+  if (saved) {
+    const hash = createHash('sha256').update(await readFile(saved.sourcePath)).digest('hex');
+    if (hash !== saved.sourceHash) throw new Error('沉淀来源快照被修改，请检查本地资料');
+    return saved;
+  }
+
+  // 固定本次最新全文；在依赖 Codex 建聊之前持久化快照断点。
+  options.onStage?.('reading');
+  const items = await readExperienceSource(store, sourceId, options.signal);
+  const sourceCapturedAt = store.at();
+  const { sourcePath, sourceHash } = prepareExperienceContext(join(dataDir, 'experience-chats'), sourceId, items);
+  const snapshot = { sourcePath, sourceHash, sourceCapturedAt };
+  options.onSourceSnapshot?.(snapshot);
+  return snapshot;
+}
+
+/** 准备指定记录的沉淀聊天；重复提交共享任务，重试沿用原快照和断点。 */
 export async function prepareExperienceChat(store: Store, sourceId: string, wikiRoot: string, vaultRoot: string, options: PreparationOptions = {}) {
   // 只能从可信业务会话创建；内部沉淀线程不能递归成为新的来源。
   const source = store.sessions().find(session => session.id === sourceId);
   if (!source) throw new Error('会话不存在，请先同步会话列表');
+  const { recordId } = options;
+  const recordKey = `${sourceId}/${recordId ?? sourceId}`;
 
-  // 首次准备共用同一个任务；已有聊天不再读取原文或重复创建。
-  let pending = preparingExperiences.get(sourceId);
-  if (!pending) {
-    pending = (async () => {
-      const existing = store.meta<ExperienceChat | null>(`experience.chat.${sourceId}`, null);
-      if (existing) return { chat: existing, created: false };
-      let context: ReturnType<typeof prepareExperienceContext> | undefined;
-      if (!options.resume) {
-        options.onStage?.('reading');
-        const items = await readExperienceSource(store, sourceId, options.signal);
-        context = prepareExperienceContext(join(dataDir, 'experience-chats'), sourceId, items);
-      } else if (options.resume.sourceId !== sourceId) throw new Error('沉淀断点来源不匹配');
-      options.signal?.throwIfAborted();
-      options.onStage?.('connecting');
-
-      // 使用普通持久会话，在 Codex 内选择模型、确认经验并完成 ingest。
-      const chat = await withCodex(async ({ request }) => {
-        // 已有可信线程断点时复用原 ID，防止失败重试创建重复会话。
-        let threadId = options.resume?.threadId;
-        if (!threadId) {
-          options.onStage?.('creating');
-          threadId = threadPageSchema.shape.data.element.parse((await request('thread/start', { cwd: vaultRoot, ephemeral: false })).thread).id;
-        }
-        store.registerBackgroundSession(threadId, `experience:${sourceId}`);
-
-        // 先保存交接断点再执行 RPC；重试检查已有条目，避免重复注入。
-        let checkpointed = false;
-        try {
-          const chat = options.resume ?? writeExperienceTask({ ...context!, sourceId, threadId, title: source.title || source.preview?.slice(0, 100) || sourceId, createdAt: store.at(), wikiRoot, vaultRoot,
-            ingestSkill: process.env.AI_TODOS_WIKI_INGEST_SKILL || join(homedir(), 'work/code/person_code/claude-obsidian/skills/wiki-ingest/SKILL.md'),
-          });
-          options.onStage?.('seeding', chat);
-          checkpointed = !!options.onStage;
-          const prefill = `请读取并遵循 ${chat.contextPath}，开始这次会话经验沉淀。先展示值得保留的经验，正式 Wiki 写入前等待我的明确批准。`;
-          const seeded = options.resume && z.array(z.unknown()).parse((await request('thread/items/list', { threadId, cursor: null, limit: 1, sortDirection: 'asc' })).data).length > 0;
-          if (!seeded) await request('thread/inject_items', { threadId, items: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: prefill }] }] });
-          await request('thread/name/set', { threadId, name: `经验沉淀 · ${chat.title}`.slice(0, 300) });
-          store.registerExperienceChat(chat);
-          return chat;
-        } catch (error) {
-          // 后台任务已有断点时保留原线程供显式重试；同步旧入口沿用失败归档。
-          if (!checkpointed) {
-            try { await request('thread/archive', { threadId }); }
-            catch { throw new Error(`沉淀会话准备失败，且无法归档：${threadId}`); }
-          }
-          throw error;
-        }
-      }, 30000, false, options.signal, 'native-chat');
-      return { chat, created: true };
-    })();
-    preparingExperiences.set(sourceId, pending);
-    void pending.finally(() => preparingExperiences.delete(sourceId)).catch(() => {});
+  // 同一请求只准备一次。已完成交接时复用该条记录，独立提交另读原文。
+  const pending = preparingExperiences.get(recordKey);
+  if (pending) return pending;
+  const existing = store.experienceRecordChat(sourceId, recordId ?? sourceId);
+  if (existing) return { chat: existing, created: false };
+  if ([...preparingExperiences.keys()].some(key => key.startsWith(`${sourceId}/`))) {
+    throw new Error('此来源正在准备其他沉淀记录，请稍后再试');
   }
-  return pending;
+  if (options.resume && options.resume.sourceId !== sourceId) throw new Error('沉淀断点来源不匹配');
+
+  // 注册 Promise 后再处理快照与 RPC，所有退出路径均清除同一记录的内存任务。
+  const run = async () => {
+    const context = options.resume ? undefined : await captureExperienceSource(store, sourceId, options);
+    options.signal?.throwIfAborted();
+    options.onStage?.('connecting');
+    const chat = await withCodex(async ({ request }) => {
+      // 已有可信线程断点时复用原 ID，防止失败重试创建重复会话。
+      let threadId = options.resume?.threadId;
+      if (!threadId) {
+        options.onStage?.('creating');
+        threadId = threadPageSchema.shape.data.element.parse((await request('thread/start', { cwd: vaultRoot, ephemeral: false })).thread).id;
+      }
+      // 宿主若给出已占用的标识，须在注册、注入或归档之前保护原聊天。
+      if (threadId === sourceId || store.experienceChatForThread(threadId)) {
+        throw new Error('Codex 返回的沉淀聊天已关联其他记录，请核对记录');
+      }
+      store.registerBackgroundSession(threadId, `experience:${sourceId}`);
+
+      // 先保存交接断点再执行 RPC；重试检查已有条目，避免重复注入。
+      let checkpointed = false;
+      try {
+        const chat = options.resume ?? writeExperienceTask({
+          ...context!, sourceId, threadId, title: source.title || source.preview?.slice(0, 100) || sourceId,
+          createdAt: store.at(), wikiRoot, vaultRoot, focus: options.focus, previousSourcePath: options.previousSourcePath,
+          ingestSkill: process.env.AI_TODOS_WIKI_INGEST_SKILL || join(homedir(), 'work/code/person_code/claude-obsidian/skills/wiki-ingest/SKILL.md'),
+        });
+        options.onStage?.('seeding', chat);
+        checkpointed = !!options.onStage;
+        const prefill = `请读取并遵循 ${chat.contextPath}，开始这次会话经验沉淀。先展示值得保留的经验，正式 Wiki 写入前等待我的明确批准。`;
+        const seeded = options.resume && z.array(z.unknown()).parse((await request('thread/items/list', { threadId, cursor: null, limit: 1, sortDirection: 'asc' })).data).length > 0;
+        if (!seeded) await request('thread/inject_items', { threadId, items: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: prefill }] }] });
+        await request('thread/name/set', { threadId, name: `经验沉淀 · ${chat.title}`.slice(0, 300) });
+        store.registerExperienceChat(chat, recordId);
+        return chat;
+      } catch (error) {
+        // 后台任务已有断点时保留原线程供显式重试；同步旧入口沿用失败归档。
+        if (!checkpointed) {
+          try { await request('thread/archive', { threadId }); }
+          catch { throw new Error(`沉淀会话准备失败，且无法归档：${threadId}`); }
+        }
+        throw error;
+      }
+    }, 30000, false, options.signal, 'native-chat');
+    return { chat, created: true };
+  };
+  const preparation = Promise.resolve().then(run);
+  preparingExperiences.set(recordKey, preparation);
+  try { return await preparation; }
+  finally { preparingExperiences.delete(recordKey); }
 }
 
-/** 打开已准备的沉淀聊天；旧入口仍可同步准备，已有轮次时直接跳转并保留草稿。 */
-export async function openExperienceChat(store: Store, sourceId: string, wikiRoot: string, vaultRoot: string) {
-  // 准备与系统跳转分离，后台完成只保存状态，不抢占用户窗口。
+/** 打开指定历史记录时只做系统跳转；未指定记录的老入口仍支持首次准备和预填。 */
+export async function openExperienceChat(store: Store, sourceId: string, wikiRoot: string, vaultRoot: string, recordId?: string) {
+  // 历史记录必须已经关联聊天；即使尚无真实轮次也不能因为查看而触发新提取。
+  const latest = recordId ? undefined : store.experienceRecords(sourceId)[0];
+  if (recordId || latest && !latest.legacy) {
+    const chat = recordId ? store.experienceRecordChat(sourceId, recordId) : latest?.chat;
+    if (!chat) throw new Error('沉淀记录尚无可打开的聊天，请查看该记录的准备状态');
+    await openCodexLink(`codex://threads/${chat.threadId}`);
+    return { chat, prefilled: false };
+  }
+
+  // 旧面板可能在后台准备时尝试打开，保护已有记录及其断点。
+  if (latest?.preparation && !latest.chat) throw new Error(latest.preparation.error || '沉淀记录尚未准备好');
   const { chat, created } = await prepareExperienceChat(store, sourceId, wikiRoot, vaultRoot);
 
   // 已开聊的可信记录直接用于跳转；新建聊天尚未推理，无需再次启动 CLI 查询。

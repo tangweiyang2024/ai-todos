@@ -7,7 +7,6 @@ import { readFileSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from 'n
 import { Store, DomainError, errorPayload } from './domain.ts';
 import { codexAction, extractWikiExperience, generateSessionSummary, listWikiModels, openExperienceChat, prepareExperienceChat, startExperienceExtraction } from './codex.ts';
 import { ExperiencePreparations } from './experience-preparation.ts';
-import type { ExperiencePreparation } from './experience-preparation.ts';
 import { selectSummaryCandidates } from './session-summary.ts';
 import { WikiExperience } from './wiki-experience.ts';
 import { sameWikiModel, validateWikiModel } from './wiki-models.ts';
@@ -33,10 +32,7 @@ let wikiStore: WikiExperience | undefined;
 const wikiRoot = resolve(process.env.AI_TODOS_WIKI_ROOT || join(homedir(), 'Documents/Obsidian Vault/40-LLM-Wiki/wiki'));
 const vaultRoot = process.env.AI_TODOS_VAULT_ROOT ? resolve(process.env.AI_TODOS_VAULT_ROOT) :
   basename(dirname(wikiRoot)) === '40-LLM-Wiki' ? dirname(dirname(wikiRoot)) : undefined;
-const experiencePreparations = new ExperiencePreparations(store, async (sourceId, options) => {
-  if (!vaultRoot) throw new Error('请配置 AI_TODOS_VAULT_ROOT 后再准备沉淀会话');
-  return (await prepareExperienceChat(store, sourceId, wikiRoot, vaultRoot, options)).chat;
-}, (chat, options) => startExperienceExtraction(store, chat, options));
+let experiencePreparations: ExperiencePreparations;
 function wiki() {
   // 首次访问时恢复中断的写入，恢复失败时不缓存不可用的连接。
   if (!wikiStore) {
@@ -162,16 +158,21 @@ async function wikiAction(raw: unknown, owner: string) {
   const input = wikiActionSchema.parse(raw);
   // 归档复用稳定 UI 信封，避开旧 MCP 工具定义；显示版本与人工边界仍由 Store 校验。
   if (input.operation === 'archive_session') return store.confirmSession(input.confirmation);
+  // 发起与重试分别定位新记录和原断点，共享浏览器及嵌入面板的校验入口。
   if (input.operation === 'prepare_capture') {
     if (!vaultRoot) throw new Error('请配置 AI_TODOS_VAULT_ROOT 后再准备沉淀会话');
     const preference = store.meta<{ revision: number; selection: WikiModelSelection | null }>('experience.modelPreference', { revision: 0, selection: null });
     if (!preference.selection) throw new Error('请先在设置中保存沉淀默认模型');
-    return experiencePreparations.start(input.sessionId, preference.selection);
+    const request = input.recordId ? { recordId: input.recordId, focus: input.focus } : undefined;
+    return experiencePreparations.start(input.sessionId, preference.selection, request);
   }
+  if (input.operation === 'retry_capture') return experiencePreparations.retry(input.sessionId, input.recordId);
   if (input.operation === 'ack_capture') return experiencePreparations.acknowledge(input.sessionId, input.jobId);
   if (input.operation === 'open_capture') {
     if (!vaultRoot) throw new Error('请配置 AI_TODOS_VAULT_ROOT 后再打开沉淀会话');
-    const job = store.meta<ExperiencePreparation | null>(`experience.preparation.${input.sessionId}`, null);
+    // 历史入口仅跳转到选中的聊天；旧版单按钮沿用最近一次准备状态。
+    if (input.recordId) return openExperienceChat(store, input.sessionId, wikiRoot, vaultRoot, input.recordId);
+    const job = store.experienceRecords(input.sessionId)[0]?.preparation;
     if (job && job.status !== 'ready' && !(job.status === 'failed' && job.stage === 'extracting')) throw new Error(job.error || '沉淀会话还在后台准备，请稍后进入');
     return openExperienceChat(store, input.sessionId, wikiRoot, vaultRoot);
   }
@@ -279,10 +280,11 @@ const server = createServer(async (req, res) => {
     // 仅接受本机目标地址，内部接口使用单独的服务令牌。
     if (req.headers.host !== `127.0.0.1:${port}`) return send(res, 403, errorPayload(new DomainError('errors.loopbackOnly')));
     const path = new URL(req.url!, origin).pathname;
+    if (stopping) return send(res, 503, { name: 'ai-todos', stopping: true, error: '服务正在关闭' }, { Connection: 'close' });
     if (path === '/health' && req.method === 'GET') return send(res, 200, { name: 'ai-todos', version: pkg.version });
     if (path.startsWith('/internal/')) {
       if (!same(req.headers.authorization, `Bearer ${token}`)) return send(res, 401, errorPayload(new DomainError('errors.unauthorized')));
-      if (path === '/internal/ping') return send(res, 200, { ok: true, wikiUiRevision: 9 });
+      if (path === '/internal/ping') return send(res, 200, { ok: true, wikiUiRevision: 10 });
       if (path === '/internal/state') return send(res, 200, store.snapshot());
       if (path === '/internal/task' && req.method === 'POST') {
         const input = await body(req); return send(res, 200, { task: store.get('task', input.id), history: store.taskHistory(input.id) });
@@ -349,26 +351,60 @@ const timer = setInterval(() => {
   for (const [key, value] of wikiTickets) if (value.expires < Date.now()) wikiTickets.delete(key);
   for (const [key, value] of reviews) if (value.expires < Date.now()) reviews.delete(key);
 }, 15000);
-server.on('error', error => { clearInterval(timer); store.close(); console.error(error.message); process.exitCode = 1; });
-server.listen(port, '127.0.0.1', () => {
+let stopping = false;
+const startupDeadline = Date.now() + 4000;
+function listen() {
+  if (!stopping) server.listen(port, '127.0.0.1');
+}
+server.on('error', async (error: NodeJS.ErrnoException) => {
+  // 升级客户端可能在旧实例取消原生提取期间启动新进程，仅等候正在退出的实例。
+  if (error.code === 'EADDRINUSE' && Date.now() < startupDeadline && !stopping) {
+    const response = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(300) }).catch(() => undefined);
+    const health = response?.status === 503 ? await response.json().catch(() => undefined) : undefined;
+    if (stopping) return;
+    if (!response || (health?.name === 'ai-todos' && health.stopping === true)) {
+      setTimeout(listen, 100);
+      return;
+    }
+  }
+
+  // 正常运行的服务拥有该端口，竞争者退出，不恢复数据库中的活动任务。
+  if (stopping) return;
+  clearInterval(timer);
+  store.close();
+  console.error(error.message);
+  process.exitCode = 1;
+});
+server.on('listening', () => {
+  // 成功独占端口才可恢复中断任务，避免并行启动者修改实际运行中的记录。
+  experiencePreparations = new ExperiencePreparations(store, async (sourceId, options) => {
+    if (!vaultRoot) throw new Error('请配置 AI_TODOS_VAULT_ROOT 后再准备沉淀会话');
+    return (await prepareExperienceChat(store, sourceId, wikiRoot, vaultRoot, options)).chat;
+  }, (chat, options) => startExperienceExtraction(store, chat, options));
+
+  // 恢复结束后发布连接信息，新请求可以安全读取状态。
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   writeFileSync(runtimePath, JSON.stringify({ pid: process.pid, origin, token }), { mode: 0o600 });
   chmodSync(runtimePath, 0o600);
   console.error(`ai-todos listening at ${origin}`);
 });
-let stopping = false;
-function shutdown() {
+listen();
+
+async function shutdown() {
+  // 拒绝新请求并取消后台任务，保持监听直到本次沉淀断点落盘。
   if (stopping) return;
   stopping = true;
   clearInterval(timer);
   stoppingSummaries = true;
   summaryRun?.controller.abort();
-  const preparationStopped = experiencePreparations.stop();
-  // 停止后台模型并等待断点落盘，再关闭数据库，避免留下无法恢复的半写状态。
+  const preparationStopped = experiencePreparations?.stop();
   for (const controller of wikiJobControllers.values()) controller.abort();
   for (const comparison of wikiComparisons.values()) comparison.controller.abort();
+
+  // 交出端口后，新实例可以恢复记录；现有请求和其他后台任务结束后再关闭数据库。
+  await preparationStopped;
   server.close(() => {
-    void Promise.allSettled([preparationStopped, ...wikiJobs.values(), ...[...wikiComparisons.values()].map(run => run.pending), ...(summaryRun ? [summaryRun.pending] : [])]).then(() => {
+    void Promise.allSettled([...wikiJobs.values(), ...[...wikiComparisons.values()].map(run => run.pending), ...(summaryRun ? [summaryRun.pending] : [])]).then(() => {
       try { if (JSON.parse(readFileSync(runtimePath, 'utf8')).token === token) unlinkSync(runtimePath); } catch {}
       wikiStore?.close(); store.close();
     });

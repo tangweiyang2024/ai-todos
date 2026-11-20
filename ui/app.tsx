@@ -5,7 +5,7 @@ import { i18n, getLocale, applyHostLocale, getLanguagePreference, setLanguagePre
 import type { LanguagePreference } from './i18n.ts';
 import type { TranslationKey, Locale } from '../src/i18n.ts';
 import type { ReactNode } from 'react';
-import type { Task, TaskDraft, Project, KeyResult, Plan, InboxItem, Entity, Kind, Snapshot, TaskEvent, DefinitionSuggestion, CaptureSuggestion, DefinitionField, Delivery as TaskDelivery, Session, CommandInput, TransitionState } from '../src/types.ts';
+import type { Task, TaskDraft, Project, KeyResult, Plan, InboxItem, Entity, Kind, Snapshot, TaskEvent, DefinitionSuggestion, CaptureSuggestion, DefinitionField, ExperienceRecordView, Delivery as TaskDelivery, Session, CommandInput, TransitionState } from '../src/types.ts';
 import type { Modal, Decision, FocusOperation, TaskCallbacks } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -17,6 +17,11 @@ import { SessionHistory } from './components/SessionHistory.tsx';
 import { SessionList } from './components/SessionList.tsx';
 import { sessionWithinDays, sessionOverlapsRange, sessionProject, eligibleProjectPending, matchesSessionSearch } from './session-list.ts';
 import { SessionBatchDialog } from './components/SessionBatchDialog.tsx';
+import { CaptureRecordDialog, type CaptureDialogState } from './components/CaptureRecordDialog.tsx';
+import { captureDate } from './components/ExperienceProgress.tsx';
+import type { ExperiencePreparationView } from '../src/experience-preparation.ts';
+import type { CaptureActionHandler } from './components/ExperienceCaptureButton.tsx';
+import { nextCaptureNotice } from './capture-notice.ts';
 import { ExperienceReadyNotice } from './components/ExperienceReadyNotice.tsx';
 import { WikiExperience } from './components/WikiExperience.tsx';
 import { parseWikiLink } from './wiki-link.ts';
@@ -161,6 +166,7 @@ function Workspace() {
   const [ranges, setRanges] = useState({ pending: { mode: '2', from: '', to: '' }, completed: { mode: '2', from: '', to: '' } });
   const [modal, setModal] = useState<Modal | null>(null);
   const [experienceSession, setExperienceSession] = useState<string | null>(null);
+  const [captureDialog, setCaptureDialog] = useState<CaptureDialogState | null>(null);
   const [experienceRecord, setExperienceRecord] = useState<string | undefined>();
   const [experienceRevision, setExperienceRevision] = useState<number | undefined>();
   const [error, setError] = useState('');
@@ -192,7 +198,7 @@ function Workspace() {
     if (busyRef.current) return false;
     busyRef.current = true; setBusy(true); setError('');
     try { await action(); if (close) setModal(modalRef.current?.returnTo || null); if (success) toast(success); return true; }
-    catch (reason) { if (modalRef.current) setError((reason instanceof Error ? reason.message : String(reason))); else toast((reason instanceof Error ? reason.message : String(reason))); return false; }
+    catch (reason) { if (modalRef.current || captureDialog) setError((reason instanceof Error ? reason.message : String(reason))); else toast((reason instanceof Error ? reason.message : String(reason))); return false; }
     finally { busyRef.current = false; setBusy(false); }
   };
   const open = (value: Modal) => { setError(''); setModal({ ...value, key: crypto.randomUUID() }); };
@@ -254,8 +260,8 @@ function Workspace() {
     const result = await syncThreads(); toast(t("session.synced", { count: result.count, value: result.transport === 'history' ? t("connection.historyOnly") : '' }));
   });
   const openSession = (id: string) => run(() => openCodexSession(id));
-  // 卡片只负责交接到普通 Codex 沉淀聊天，审核和 ingest 在该会话内完成。
-  const openExperience = (id: string) => run(async () => {
+  // 缺少多记录能力的旧服务继续使用原卡片的来源级操作。
+  const openLegacyCapture = (id: string) => run(async () => {
     // 读取当前来源的持久化准备状态，避免重复启动或打开未完成的聊天。
     const session = snapshotRef.current?.sessions.find(session => session.id === id);
     const preparation = session?.experiencePreparation;
@@ -279,6 +285,68 @@ function Workspace() {
     if (preparation?.status === 'ready' && preparation.unread) await api('wiki/ack_capture', { sessionId: id, jobId: preparation.id });
     await refresh(true);
     toast(t(result.prefilled ? 'wiki.captureOpened' : 'wiki.captureContinued'));
+  });
+  const captureSource = (id: string) => snapshotRef.current?.sessions.find(session => session.id === id)
+    ?? snapshotRef.current?.tasks.find(task => task.ai?.id === id)?.ai;
+
+  const openStoredCapture = (sessionId: string, record: ExperienceRecordView) => run(async () => {
+    // 打开指定聊天后再标记其提醒，失败的跳转保留未读状态。
+    await api('wiki/open_capture', { sessionId, recordId: record.id });
+    const job = record.preparation;
+    if (job?.status === 'ready' && job.unread) await api('wiki/ack_capture', { sessionId, jobId: job.id });
+
+    // 离开历史弹窗并刷新这条记录的已读状态。
+    await refresh(true);
+    setCaptureDialog(null);
+    toast(t('wiki.captureContinued'));
+  });
+
+  const selectCapture = (sessionId: string, record: ExperienceRecordView) => {
+    // 首轮已结束的聊天直接打开；准备中或失败的记录先展示状态和可用操作。
+    if (record.experience && (!record.preparation || record.preparation.status === 'ready')) {
+      void openStoredCapture(sessionId, record);
+      return;
+    }
+
+    // 缺少可直接进入的结果时，仅打开该记录的实时详情。
+    setError('');
+    setCaptureDialog({ kind: 'record', sessionId, recordId: record.id });
+  };
+
+  const openExperience: CaptureActionHandler = (sessionId, action) => {
+    // 旧服务不接收记录标识；历史浏览仅按选中的记录跳转。
+    if (action === 'legacy') { void openLegacyCapture(sessionId); return; }
+    setError('');
+    if (action === 'history') {
+      const records = captureSource(sessionId)?.experienceRecords ?? [];
+      if (records.length === 1) selectCapture(sessionId, records[0]);
+      else if (records.length > 1) setCaptureDialog({ kind: 'history', sessionId });
+      return;
+    }
+
+    // 一次新建表单分配一次请求标识，网络失败后重提交仍使用同一标识。
+    if (!snapshotRef.current?.captureModelPreference?.selection) {
+      setView(current => ({ ...current, page: 'settings' }));
+      toast(t('wiki.captureChooseDefault'));
+      return;
+    }
+    setCaptureDialog({ kind: 'new', sessionId, recordId: crypto.randomUUID() });
+  };
+
+  const submitCapture = (sessionId: string, recordId: string, operation: 'prepare_capture' | 'retry_capture', focus?: string) => run(async () => {
+    // 重试只携带所选记录标识，沿用原模型和已确定的提取重点。
+    const { job } = await api(`wiki/${operation}`, { sessionId, recordId, ...(focus ? { focus } : {}) }) as { job: ExperiencePreparationView };
+
+    // 网络重投可能返回已经结束的任务或首次提交的重点，以原记录为准。
+    await refresh(true);
+    if (job.status !== 'preparing' || (operation === 'prepare_capture' && (job.focus ?? '') !== (focus ?? ''))) {
+      setCaptureDialog({ kind: 'record', sessionId, recordId });
+      return;
+    }
+
+    // 确认本次任务处于准备状态后才通知用户已排队。
+    setCaptureDialog(null);
+    toast(t('wiki.captureQueued'));
   });
   const deferCaptureNotice = (id: string, jobId: string) => run(async () => {
     await api('wiki/ack_capture', { sessionId: id, jobId });
@@ -472,7 +540,8 @@ function Workspace() {
     }
   }
   // 多个完成提醒逐个处理；编辑或审核期间先保留未读，避免覆盖正在进行的操作。
-  const readyCapture = !modal && !batchSessions && !experienceSession ? snapshot.sessions.filter(session => session.experiencePreparation?.status === 'ready' && session.experiencePreparation.modelSelection && session.experiencePreparation.unread).sort((a, b) => a.experiencePreparation!.updatedAt.localeCompare(b.experiencePreparation!.updatedAt))[0] : undefined;
+  const readyCapture = !modal && !batchSessions && !experienceSession && !captureDialog ? nextCaptureNotice(snapshot.sessions) : undefined;
+  const dialogSource = captureDialog ? captureSource(captureDialog.sessionId) : undefined;
   return <><div className="workspace-shell"><aside className="workspace-sidebar">
     <div className="workspace-brand"><span>a</span> ai-todos</div>
     <div className="workspace-sidebar__label">{t('workspace.label')}</div>
@@ -515,7 +584,19 @@ function Workspace() {
     {experienceSession && <WikiExperience key={experienceSession} sessionId={experienceSession} initialRecordId={experienceRecord} initialRevision={experienceRevision} embedded={embedded} browserOrigin={localOrigin} call={api} onClose={() => setExperienceSession(null)} />}
     {batchSessions && <SessionBatchDialog sessions={batchSessions} onClose={() => setBatchSessions(null)} onConfirm={session => confirmSession(session, true, true)} onFinished={count => toast(t('batch.success', { count }))} onRefresh={async () => { const scope = new Set(batchSessions.map(session => session.id)); const fresh = await refresh(true); return fresh.sessions.filter(session => scope.has(session.id)); }} />}
     {modal && <EditorDialog key={modal.key} title={modalTitle} description={modalDescription} busy={busy} error={error} onClose={() => setModal(modal.returnTo || null)}>{modalBody}</EditorDialog>}
-    {readyCapture && <ExperienceReadyNotice title={readyCapture.title || readyCapture.id} busy={busy} onOpen={() => openExperience(readyCapture.id)} onLater={() => deferCaptureNotice(readyCapture.id, readyCapture.experiencePreparation!.id)} />}
+    {captureDialog && <CaptureRecordDialog
+      key={captureDialog.kind === 'new' ? captureDialog.recordId : captureDialog.sessionId}
+      state={captureDialog} sessionTitle={dialogSource?.title || captureDialog.sessionId} records={dialogSource?.experienceRecords ?? []}
+      busy={busy} error={error} onClose={() => setCaptureDialog(null)}
+      onPrepare={focus => { if (captureDialog.kind === 'new') void submitCapture(captureDialog.sessionId, captureDialog.recordId, 'prepare_capture', focus); }}
+      onSelect={record => selectCapture(captureDialog.sessionId, record)}
+      onOpen={record => openStoredCapture(captureDialog.sessionId, record)}
+      onRetry={record => submitCapture(captureDialog.sessionId, record.id, 'retry_capture')}
+      onOpenSource={() => openSession(captureDialog.sessionId)} />}
+    {readyCapture && <ExperienceReadyNotice title={readyCapture.session.title || readyCapture.session.id} description={t(readyCapture.descriptionKey)}
+      detail={readyCapture.record && [t('wiki.captureStartedAt', { at: captureDate(readyCapture.record.createdAt) }), readyCapture.record.focus].filter(Boolean).join(' · ')}
+      busy={busy} onOpen={() => readyCapture.record ? selectCapture(readyCapture.session.id, readyCapture.record) : openLegacyCapture(readyCapture.session.id)}
+      onLater={() => deferCaptureNotice(readyCapture.session.id, readyCapture.preparation.id)} />}
     {message && <div className="toast" role="status" aria-live="polite">{message}</div>}
   </>;
 }

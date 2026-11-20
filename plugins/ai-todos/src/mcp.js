@@ -42530,6 +42530,17 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default3 = {
+  "wiki.newCapture": "Start a new capture",
+  "wiki.captureHistoryCount": "View capture history ({{count}})",
+  "wiki.captureHistory": "Capture history",
+  "wiki.captureFocus": "Focus for this capture (optional)",
+  "wiki.captureFocusHint": "For example, capture the conditions the maintainer clarified later.",
+  "wiki.captureScope": "Scope: full conversation available at capture time",
+  "wiki.captureScopeAt": "Scope: full conversation as of {{at}}",
+  "wiki.captureScopeUnknown": "Scope: snapshot time unavailable",
+  "wiki.captureStartedAt": "Started {{at}}",
+  "wiki.captureRecord": "Capture details",
+  "wiki.captureSourceLink": "Open source conversation",
   "wiki.reviewCapture": "Review extraction result",
   "wiki.captureInspect": "Inspect conversation",
   "wiki.captureChooseDefault": "Choose and save a default capture model, then return to the card to start.",
@@ -43332,6 +43343,17 @@ var en_default3 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "wiki.newCapture": "\u53D1\u8D77\u65B0\u6C89\u6DC0",
+  "wiki.captureHistoryCount": "\u67E5\u770B\u6C89\u6DC0\u8BB0\u5F55\uFF08{{count}}\uFF09",
+  "wiki.captureHistory": "\u6C89\u6DC0\u8BB0\u5F55",
+  "wiki.captureFocus": "\u672C\u6B21\u91CD\u70B9\uFF08\u9009\u586B\uFF09",
+  "wiki.captureFocusHint": "\u4F8B\u5982\uFF1A\u8865\u5145\u7EF4\u62A4\u4EBA\u540E\u6765\u786E\u8BA4\u7684\u751F\u6548\u6761\u4EF6",
+  "wiki.captureScope": "\u63D0\u53D6\u8303\u56F4\uFF1A\u53D1\u8D77\u65F6\u53EF\u8BFB\u53D6\u7684\u4F1A\u8BDD\u5168\u6587",
+  "wiki.captureScopeAt": "\u63D0\u53D6\u8303\u56F4\uFF1A\u622A\u81F3 {{at}} \u7684\u4F1A\u8BDD\u5168\u6587",
+  "wiki.captureScopeUnknown": "\u63D0\u53D6\u8303\u56F4\uFF1A\u5FEB\u7167\u65F6\u95F4\u672A\u8BB0\u5F55",
+  "wiki.captureStartedAt": "\u53D1\u8D77\u4E8E {{at}}",
+  "wiki.captureRecord": "\u6C89\u6DC0\u8BB0\u5F55\u8BE6\u60C5",
+  "wiki.captureSourceLink": "\u6253\u5F00\u6765\u6E90\u4F1A\u8BDD",
   "wiki.reviewCapture": "\u67E5\u770B\u63D0\u53D6\u7ED3\u679C",
   "wiki.captureInspect": "\u8FDB\u5165\u4F1A\u8BDD\u6838\u5BF9",
   "wiki.captureChooseDefault": "\u8BF7\u5148\u9009\u62E9\u5E76\u4FDD\u5B58\u6C89\u6DC0\u9ED8\u8BA4\u6A21\u578B\uFF0C\u7136\u540E\u8FD4\u56DE\u5361\u7247\u5F00\u59CB\u63D0\u53D6\u3002",
@@ -44300,8 +44322,14 @@ var codexActionSchema = external_exports.discriminatedUnion("operation", [
 var id2 = external_exports.string().uuid();
 var revision2 = external_exports.number().int().positive();
 var list = external_exports.object({ operation: external_exports.literal("list"), sessionId: id2 }).strict();
-var openCapture = external_exports.object({ operation: external_exports.literal("open_capture"), sessionId: id2 }).strict();
-var prepareCapture = external_exports.object({ operation: external_exports.literal("prepare_capture"), sessionId: id2 }).strict();
+var openCapture = external_exports.object({ operation: external_exports.literal("open_capture"), sessionId: id2, recordId: id2.optional() }).strict();
+var prepareCapture = external_exports.object({
+  operation: external_exports.literal("prepare_capture"),
+  sessionId: id2,
+  recordId: id2.optional(),
+  focus: external_exports.string().trim().max(2e3).optional()
+}).strict().refine((input2) => !input2.focus || !!input2.recordId, "\u6307\u5B9A\u672C\u6B21\u91CD\u70B9\u65F6\u9700\u8981\u8BB0\u5F55\u6807\u8BC6");
+var retryCapture = external_exports.object({ operation: external_exports.literal("retry_capture"), sessionId: id2, recordId: id2 }).strict();
 var ackCapture = external_exports.object({ operation: external_exports.literal("ack_capture"), sessionId: id2, jobId: id2 }).strict();
 var archiveSession = external_exports.object({ operation: external_exports.literal("archive_session"), confirmation: sessionConfirmSchema.extend({ archive: external_exports.literal(true) }) }).strict();
 var models = external_exports.object({ operation: external_exports.literal("models") }).strict();
@@ -44316,11 +44344,11 @@ var preview = external_exports.object({ operation: external_exports.literal("pre
 var compare = external_exports.object({ operation: external_exports.literal("compare"), id: id2, revision: revision2, modelSelection: wikiModelSelectionSchema.optional() }).strict();
 var approve = external_exports.object({ operation: external_exports.literal("approve"), ticket: external_exports.string().regex(/^[a-f0-9]{48}$/) }).strict();
 var openReview = external_exports.object({ operation: external_exports.literal("open_review"), id: id2, revision: revision2 }).strict();
-var wikiActionSchema = external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, captureModel, generate, start, progress, cancel, update, reject, compare, preview, approve]);
+var wikiActionSchema = external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, retryCapture, ackCapture, archiveSession, models, captureModel, generate, start, progress, cancel, update, reject, compare, preview, approve]);
 var wikiUiSchema = external_exports.object({
   uiSessionId: id2,
   bridgeRevision: external_exports.literal(1).optional(),
-  action: external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, ackCapture, archiveSession, models, captureModel, generate, start, progress, cancel, update, reject, compare, preview, openReview])
+  action: external_exports.discriminatedUnion("operation", [list, openCapture, prepareCapture, retryCapture, ackCapture, archiveSession, models, captureModel, generate, start, progress, cancel, update, reject, compare, preview, openReview])
 }).strict();
 var wikiBridgeSchema = external_exports.object({
   uiSessionId: id2,
@@ -44392,7 +44420,7 @@ async function connect() {
       const health = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(600) }).then((response2) => response2.json());
       const comparison = typeof health.version === "string" ? package_default.version.localeCompare(health.version, void 0, { numeric: true }) : -1;
       const revision3 = typeof capabilities.wikiUiRevision === "number" ? capabilities.wikiUiRevision : 0;
-      if (health.name === "ai-todos" && (comparison > 0 || comparison === 0 && revision3 < 9)) {
+      if (health.name === "ai-todos" && (comparison > 0 || comparison === 0 && revision3 < 10)) {
         const stopped = await fetch(`${origin}/internal/stop`, { method: "POST", headers: { authorization: `Bearer ${candidate.token}` }, signal: AbortSignal.timeout(1e3) });
         if (!stopped.ok) throw new Error("\u65E7\u670D\u52A1\u505C\u6B62\u5931\u8D25");
         return false;

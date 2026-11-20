@@ -76,3 +76,25 @@ test('a process exiting successfully without a completed agent response is not a
   await assert.rejects(runExperienceExtraction(store,chat,selection,{}),/完整/);
   assert.equal(store.meta(`experience.initial.${chat.threadId}`,null).status,'failed');
 });
+
+test('only the exact last nonempty agent answer marks a completed turn as no knowledge', async t => {
+  const marker = '本次会话无值得沉淀的复用知识';
+  for (const [name, answers, expected] of [
+    ['exact', [marker], 'no_knowledge'],
+    ['final with punctuation', ['正在核对', ' \n' + marker + '。\n', ' '], 'no_knowledge'],
+    ['marker superseded', [marker, '候选：生产只读权限已确认'], 'reviewing'],
+    ['quoted marker', ['说明中写着“' + marker + '”'], 'reviewing'],
+  ]) {
+    await t.test(name, async t => {
+      const { store, chat, selection } = fixture(t, threadId => [
+        { type: 'thread.started', thread_id: threadId }, { type: 'turn.started' },
+        ...answers.map(text => ({ type: 'item.completed', item: { type: 'agent_message', text } })),
+        { type: 'turn.completed' },
+      ]);
+      await runExperienceExtraction(store, chat, selection, {});
+      const progress = readFileSync(chat.progressPath, 'utf8');
+      assert.equal(JSON.parse(progress).stage, expected);
+      assert.ok(!progress.includes('生产只读权限已确认'));
+    });
+  }
+});

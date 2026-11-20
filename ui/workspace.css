@@ -174,3 +174,15 @@
 .experience-ready-notice__description { color:var(--muted); font-size:13px; line-height:1.7; margin:0; }
 .experience-ready-notice__actions { display:flex; gap:10px; justify-content:flex-end; margin-top:24px; }
 .experience-ready-notice__actions button { display:inline-flex; align-items:center; gap:6px; }
+
+.capture-record-list { display: grid; gap: 8px; overflow: auto; }
+.capture-record-list .capture-record-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: auto; padding: 12px; text-align: start; white-space: normal; }
+.capture-record-choice > div { min-width: 0; }
+.capture-record-choice > svg { flex-shrink: 0; }
+.capture-record-meta { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.capture-record-meta small { color: var(--text-secondary); }
+.capture-record-detail .experience-progress__summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.capture-notice-detail { margin: 4px 0; max-height: 5em; overflow: auto; overflow-wrap: anywhere; color: var(--text-secondary); font-size: 13px; }
+.capture-card-meta { margin-top: 8px; font-size: 11px; color: var(--text-secondary); }
+.capture-card-meta .capture-record-meta { gap: 2px; }
+.capture-card-meta .capture-record-meta > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

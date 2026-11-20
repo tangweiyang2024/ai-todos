@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import enErrors from 'zod/v4/locales/en.js';
 import zhErrors from 'zod/v4/locales/zh-CN.js';
-import type { Kind, EntityData, Entity, Task, Focus, Settings, Session, LiveSession, Snapshot, TimeRecord, TaskEvent, CodexProject, CodexThread, Command } from './types.ts';
+import type { Kind, EntityData, Entity, Task, Focus, Settings, Session, LiveSession, ExperienceRecordView, Snapshot, TimeRecord, TaskEvent, CodexProject, CodexThread, Command } from './types.ts';
 import { runtimeState } from './runtime.ts';
 import { isWikiAgentCwd } from './wiki-agent-state.ts';
 import { i18n, isTranslationKey, languages } from './i18n.ts';
@@ -90,6 +90,15 @@ function recordSessionActivity(session: Session, previous: Session | null, state
   session.activityHistory = [...(session.activityHistory ?? []), { at, state, event, turnId: turnId ?? null }];
 }
 
+export interface StoredExperienceRecord {
+  id: string;
+  sourceId: string;
+  createdAt: string;
+  legacy: boolean;
+  chat?: ExperienceChat;
+  preparation?: ExperiencePreparation;
+}
+
 export class Store {
   declare db: DatabaseSync;
   declare now: () => number;
@@ -102,6 +111,10 @@ export class Store {
       CREATE INDEX IF NOT EXISTS events_task_id ON events(task_id);
       CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, body TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS experience_records (
+        source_id TEXT NOT NULL, id TEXT NOT NULL, created_at TEXT NOT NULL, preparation TEXT, chat TEXT,
+        PRIMARY KEY (source_id, id)
+      );
       CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS notices (id TEXT PRIMARY KEY, body TEXT NOT NULL);`);
   }
@@ -132,26 +145,93 @@ export class Store {
   registerBackgroundSession(threadId: string, jobId: string) { this.setMeta(`wiki.agent.${threadId}`, { jobId }); }
   /** 通过持久身份和私有工作目录双重识别后台线程。 */
   isBackgroundSession(threadId: string, cwd: string) { return isWikiAgentCwd(cwd) || this.meta(`wiki.agent.${threadId}`, null) !== null; }
-  /** 记录原会话与沉淀聊天的关联；沉淀聊天不进入普通业务列表。 */
-  registerExperienceChat(chat: ExperienceChat) {
+  /** 绑定正式准备好的线程和记录；老版本关联保持原键，所有线程均从业务列表排除。 */
+  registerExperienceChat(chat: ExperienceChat, recordId?: string) {
     this.transaction(() => {
-      this.setMeta(`experience.chat.${chat.sourceId}`, chat);
-      this.setMeta(`experience.thread.${chat.threadId}`, chat.sourceId);
+      // 两端已有关联时只允许幂等注册，避免错误线程覆盖历史记录。
+      const current = this.experienceRecordChat(chat.sourceId, recordId ?? chat.sourceId);
+      const registered = this.experienceChatForThread(chat.threadId);
+      if ((current && current.threadId !== chat.threadId) || (registered && !current)) {
+        throw new Error('沉淀聊天已关联其他记录，请核对现有记录');
+      }
+
+      // 保留准备任务已固定的发起时间；同步旧入口可能先创建聊天、后产生任务。
+      if (recordId) {
+        this.db.prepare(`INSERT INTO experience_records (source_id,id,created_at,chat) VALUES (?,?,?,?)
+          ON CONFLICT(source_id,id) DO UPDATE SET chat=excluded.chat`).run(chat.sourceId, recordId, chat.createdAt, JSON.stringify(chat));
+      } else {
+        this.setMeta(`experience.chat.${chat.sourceId}`, chat);
+      }
+
+      // 持久关联使 hook 和目录同步都能定位到原始记录。
+      this.setMeta(`experience.thread.${chat.threadId}`, recordId ? { sourceId: chat.sourceId, recordId } : chat.sourceId);
       this.registerBackgroundSession(chat.threadId, `experience:${chat.sourceId}`);
     });
   }
+  /** 写入本次任务的最新断点；同一记录的重试保留初次发起时间和已关联的聊天。 */
+  saveExperiencePreparation(job: ExperiencePreparation) {
+    if (!job.recordId) return this.setMeta(`experience.preparation.${job.sourceId}`, job);
+    this.db.prepare(`INSERT INTO experience_records (source_id,id,created_at,preparation) VALUES (?,?,?,?)
+      ON CONFLICT(source_id,id) DO UPDATE SET preparation=excluded.preparation`).run(job.sourceId, job.recordId, job.createdAt, JSON.stringify(job));
+    return job;
+  }
+  /** 合并旧版按来源分开的聊天和任务；同源旧记录始终以来源 ID 标识。 */
+  private legacyExperienceRecords(sourceId?: string): StoredExperienceRecord[] {
+    // 查询指定来源时走 meta 主键；读取全部记录时按前缀找回仅有聊天或任务的旧数据。
+    const rows = sourceId
+      ? this.db.prepare('SELECT key,body FROM meta WHERE key IN (?,?)').all(`experience.chat.${sourceId}`, `experience.preparation.${sourceId}`)
+      : this.db.prepare("SELECT key,body FROM meta WHERE key GLOB 'experience.chat.*' OR key GLOB 'experience.preparation.*'").all();
+
+    // 首次启动旧任务可能比线程更早；旧数据在重试时只保留最后的任务时间。
+    const records = new Map<string, StoredExperienceRecord>();
+    for (const row of rows) {
+      const data = JSON.parse(row.body as string);
+      const record: StoredExperienceRecord = records.get(data.sourceId) ?? { id: data.sourceId, sourceId: data.sourceId, createdAt: data.createdAt, legacy: true };
+      record.createdAt = record.createdAt < data.createdAt ? record.createdAt : data.createdAt;
+      if ((row.key as string).startsWith('experience.chat.')) record.chat = data;
+      else record.preparation = data;
+      records.set(record.id, record);
+    }
+    return [...records.values()];
+  }
+  /** 从新到旧读取可恢复的原始记录；可限定为单个来源。 */
+  experienceRecords(sourceId?: string): StoredExperienceRecord[] {
+    // 同一毫秒的多个创建按首次插入顺序反排，重试或更新不会改变 rowid。
+    const rows = sourceId
+      ? this.db.prepare('SELECT * FROM experience_records WHERE source_id=? ORDER BY rowid DESC').all(sourceId)
+      : this.db.prepare('SELECT * FROM experience_records ORDER BY rowid DESC').all();
+    const records: StoredExperienceRecord[] = rows.map(row => ({
+      id: row.id as string, sourceId: row.source_id as string, createdAt: row.created_at as string, legacy: false,
+      ...(row.chat ? { chat: JSON.parse(row.chat as string) } : {}),
+      ...(row.preparation ? { preparation: JSON.parse(row.preparation as string) } : {}),
+    }));
+
+    // 旧记录留在原键，兼容直接读取旧版持久状态的调用方。
+    return records.concat(this.legacyExperienceRecords(sourceId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  /** 按来源和记录精确取已注册聊天；未完成的准备断点只用于后台恢复。 */
+  experienceRecordChat(sourceId: string, recordId: string): ExperienceChat | null {
+    // 显式发起标识可与来源 UUID 相同，优先读取该条独立记录。
+    const row = this.db.prepare('SELECT chat FROM experience_records WHERE source_id=? AND id=?').get(sourceId, recordId);
+    if (row) return row.chat ? JSON.parse(row.chat as string) : null;
+
+    // 旧聊天在实体记录尚不存在时按来源键兼容读取。
+    return recordId === sourceId ? this.meta<ExperienceChat | null>(`experience.chat.${sourceId}`, null) : null;
+  }
   /** 获取所有已准备的沉淀聊天，供宿主状态同步使用。 */
   experienceChats(): ExperienceChat[] {
-    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.chat.%'").all().map(row => JSON.parse(row.body as string));
+    return this.experienceRecords().flatMap(record => record.chat ?? []);
   }
-  /** 读取后台准备的持久化状态，供卡片投影及服务重启恢复使用。 */
+  /** 获取全部后台准备状态，包含旧版按来源保存的任务。 */
   experiencePreparations(): ExperiencePreparation[] {
-    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.preparation.%'").all().map(row => JSON.parse(row.body as string));
+    return this.experienceRecords().flatMap(record => record.preparation ?? []);
   }
-  /** 查询沉淀会话的可信关联，不根据标题或路径猜测身份。 */
+  /** 查询沉淀会话的可信关联，兼容旧版字符串映射。 */
   experienceChatForThread(id: string): ExperienceChat | null {
-    const sourceId = this.meta<string | null>(`experience.thread.${id}`, null);
-    return sourceId ? this.meta<ExperienceChat | null>(`experience.chat.${sourceId}`, null) : null;
+    const binding = this.meta<string | { sourceId: string; recordId: string } | null>(`experience.thread.${id}`, null);
+    if (!binding) return null;
+    const chat = typeof binding === 'string' ? this.experienceRecordChat(binding, binding) : this.experienceRecordChat(binding.sourceId, binding.recordId);
+    return chat?.threadId === id ? chat : null;
   }
   /** 查询沉淀聊天是否已有真实轮次；开始记录、可信轮次标识和已核实结果均可跨重启复用。 */
   experienceChatHasStarted(threadId: string): boolean {
@@ -178,24 +258,37 @@ export class Store {
     }
     this.db.prepare('INSERT OR REPLACE INTO sessions VALUES (?,?)').run(thread.id, JSON.stringify(observation));
   }
+  /** 按业务会话投影目录、宿主状态和各次沉淀进度。 */
   sessions(): LiveSession[] {
     // 沉淀会话本身隐藏，只把运行状态和明确回报投影到对应的源会话。
     const stored = this.db.prepare('SELECT body FROM sessions ORDER BY rowid DESC').all().map(r => JSON.parse(r.body as string) as Session);
     const observations = new Map(stored.map(s => [s.id, s]));
-    const chats = new Map(this.experienceChats().map(chat => [chat.sourceId, chat]));
-    const preparations = new Map(this.experiencePreparations().map(job => [job.sourceId, preparationView(job)]));
+
+    // 按各自的线程读取回报，确保相同来源的历史审核进度独立展示。
+    const recordsBySource = new Map<string, ExperienceRecordView[]>();
+    for (const { id, sourceId, createdAt, chat, preparation } of this.experienceRecords()) {
+      const sourceCapturedAt = preparation?.sourceSnapshot?.sourceCapturedAt ?? chat?.sourceCapturedAt;
+      const records = recordsBySource.get(sourceId) ?? [];
+      records.push({ id, createdAt, ...(sourceCapturedAt ? { sourceCapturedAt } : {}),
+        ...(preparation?.focus ? { focus: preparation.focus } : {}),
+        ...(preparation ? { preparation: preparationView(preparation) } : {}),
+        ...(chat ? { experience: experienceProgress(chat, observations.get(chat.threadId) ?? null, readExperienceReport(chat, this.now()), this.now()) } : {}),
+      });
+      recordsBySource.set(sourceId, records);
+    }
+
+    // 保持旧客户端读取最新一次状态的字段，新客户端按记录独立展示。
     return stored.filter(s => !this.isBackgroundSession(s.id, s.cwd)).map(s => {
       const state = runtimeState(s.observedState);
       const age = this.now() - Date.parse(s.observedAt);
       const extendedRunning = state === 'running' && s.source === 'codex-rollout' && s.event === 'task_started';
       const pendingUser = ['waiting_approval', 'waiting_input'].includes(state) && ['codex-hook', 'codex-app-server', 'codex-rollout'].includes(s.source) && Number.isFinite(age);
       const expired = ['queued', 'running', 'waiting_approval', 'waiting_input'].includes(state) && !pendingUser && age > (extendedRunning ? 1800000 : 300000);
-      const chat = chats.get(s.id);
+      const experienceRecords = recordsBySource.get(s.id) ?? [];
       const summary = this.meta<import('./types.ts').SessionSummary | null>(`session.summary.${s.id}`, null);
       const summaryStatus = this.meta<string>(`session.summary-status.${s.id}`, '');
-      const experiencePreparation = preparations.get(s.id);
-      const experience = chat ? experienceProgress(chat, observations.get(chat.threadId) ?? null, readExperienceReport(chat, this.now()), this.now()) : undefined;
-      return { ...s, ...(summary ? { summary } : {}), ...(summaryStatus ? { summaryStatus } : {}), ...(experiencePreparation ? { experiencePreparation } : {}), ...(experience ? { experience } : {}), state: expired ? 'unknown' : state, ...(!expired && (extendedRunning || pendingUser) && age > 300000 ? { stateConfidence: 'last_observed' as const } : {}) };
+      const { experience, preparation: experiencePreparation } = experienceRecords[0] ?? {};
+      return { ...s, experienceRecords, ...(summary ? { summary } : {}), ...(summaryStatus ? { summaryStatus } : {}), ...(experiencePreparation ? { experiencePreparation } : {}), ...(experience ? { experience } : {}), state: expired ? 'unknown' : state, ...(!expired && (extendedRunning || pendingUser) && age > 300000 ? { stateConfidence: 'last_observed' as const } : {}) };
     });
   }
   snapshot(): Snapshot {
@@ -277,7 +370,7 @@ export class Store {
     for (const thread of internal) if (this.experienceChatForThread(thread.id)) this.syncExperienceChat(thread);
     threads = threads.filter(thread => !this.isBackgroundSession(thread.id, thread.cwd));
     return this.transaction(() => {
-      const existing = new Map(this.sessions().map(session => { const { state, stateConfidence, experience, experiencePreparation, summary, summaryStatus, ...stored } = session; return [session.id, preserveConfirmation(stored)]; }));
+      const existing = new Map(this.sessions().map(session => { const { state, stateConfidence, experience, experiencePreparation, experienceRecords, summary, summaryStatus, ...stored } = session; return [session.id, preserveConfirmation(stored)]; }));
       const seen = new Set(); let added = 0, updated = 0;
       for (const thread of threads) {
         if (seen.has(thread.id)) continue;

@@ -21961,6 +21961,17 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default2 = {
+  "wiki.newCapture": "Start a new capture",
+  "wiki.captureHistoryCount": "View capture history ({{count}})",
+  "wiki.captureHistory": "Capture history",
+  "wiki.captureFocus": "Focus for this capture (optional)",
+  "wiki.captureFocusHint": "For example, capture the conditions the maintainer clarified later.",
+  "wiki.captureScope": "Scope: full conversation available at capture time",
+  "wiki.captureScopeAt": "Scope: full conversation as of {{at}}",
+  "wiki.captureScopeUnknown": "Scope: snapshot time unavailable",
+  "wiki.captureStartedAt": "Started {{at}}",
+  "wiki.captureRecord": "Capture details",
+  "wiki.captureSourceLink": "Open source conversation",
   "wiki.reviewCapture": "Review extraction result",
   "wiki.captureInspect": "Inspect conversation",
   "wiki.captureChooseDefault": "Choose and save a default capture model, then return to the card to start.",
@@ -22763,6 +22774,17 @@ var en_default2 = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default2 = {
+  "wiki.newCapture": "\u53D1\u8D77\u65B0\u6C89\u6DC0",
+  "wiki.captureHistoryCount": "\u67E5\u770B\u6C89\u6DC0\u8BB0\u5F55\uFF08{{count}}\uFF09",
+  "wiki.captureHistory": "\u6C89\u6DC0\u8BB0\u5F55",
+  "wiki.captureFocus": "\u672C\u6B21\u91CD\u70B9\uFF08\u9009\u586B\uFF09",
+  "wiki.captureFocusHint": "\u4F8B\u5982\uFF1A\u8865\u5145\u7EF4\u62A4\u4EBA\u540E\u6765\u786E\u8BA4\u7684\u751F\u6548\u6761\u4EF6",
+  "wiki.captureScope": "\u63D0\u53D6\u8303\u56F4\uFF1A\u53D1\u8D77\u65F6\u53EF\u8BFB\u53D6\u7684\u4F1A\u8BDD\u5168\u6587",
+  "wiki.captureScopeAt": "\u63D0\u53D6\u8303\u56F4\uFF1A\u622A\u81F3 {{at}} \u7684\u4F1A\u8BDD\u5168\u6587",
+  "wiki.captureScopeUnknown": "\u63D0\u53D6\u8303\u56F4\uFF1A\u5FEB\u7167\u65F6\u95F4\u672A\u8BB0\u5F55",
+  "wiki.captureStartedAt": "\u53D1\u8D77\u4E8E {{at}}",
+  "wiki.captureRecord": "\u6C89\u6DC0\u8BB0\u5F55\u8BE6\u60C5",
+  "wiki.captureSourceLink": "\u6253\u5F00\u6765\u6E90\u4F1A\u8BDD",
   "wiki.reviewCapture": "\u67E5\u770B\u63D0\u53D6\u7ED3\u679C",
   "wiki.captureInspect": "\u8FDB\u5165\u4F1A\u8BDD\u6838\u5BF9",
   "wiki.captureChooseDefault": "\u8BF7\u5148\u9009\u62E9\u5E76\u4FDD\u5B58\u6C89\u6DC0\u9ED8\u8BA4\u6A21\u578B\uFF0C\u7136\u540E\u8FD4\u56DE\u5361\u7247\u5F00\u59CB\u63D0\u53D6\u3002",
@@ -23611,7 +23633,7 @@ function experienceProgress(chat, observation, report, now = Date.now()) {
 
 // src/experience-preparation.ts
 function preparationView(job) {
-  const { checkpoint: _checkpoint, ...view } = job;
+  const { checkpoint: _checkpoint, sourceSnapshot: _snapshot, previousSourcePath: _previous, ...view } = job;
   return view;
 }
 
@@ -23718,6 +23740,10 @@ var Store = class {
       CREATE INDEX IF NOT EXISTS events_task_id ON events(task_id);
       CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, body TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS experience_records (
+        source_id TEXT NOT NULL, id TEXT NOT NULL, created_at TEXT NOT NULL, preparation TEXT, chat TEXT,
+        PRIMARY KEY (source_id, id)
+      );
       CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS notices (id TEXT PRIMARY KEY, body TEXT NOT NULL);`);
   }
@@ -23783,26 +23809,78 @@ var Store = class {
   isBackgroundSession(threadId, cwd) {
     return isWikiAgentCwd(cwd) || this.meta(`wiki.agent.${threadId}`, null) !== null;
   }
-  /** 记录原会话与沉淀聊天的关联；沉淀聊天不进入普通业务列表。 */
-  registerExperienceChat(chat) {
+  /** 绑定正式准备好的线程和记录；老版本关联保持原键，所有线程均从业务列表排除。 */
+  registerExperienceChat(chat, recordId) {
     this.transaction(() => {
-      this.setMeta(`experience.chat.${chat.sourceId}`, chat);
-      this.setMeta(`experience.thread.${chat.threadId}`, chat.sourceId);
+      const current = this.experienceRecordChat(chat.sourceId, recordId ?? chat.sourceId);
+      const registered = this.experienceChatForThread(chat.threadId);
+      if (current && current.threadId !== chat.threadId || registered && !current) {
+        throw new Error("\u6C89\u6DC0\u804A\u5929\u5DF2\u5173\u8054\u5176\u4ED6\u8BB0\u5F55\uFF0C\u8BF7\u6838\u5BF9\u73B0\u6709\u8BB0\u5F55");
+      }
+      if (recordId) {
+        this.db.prepare(`INSERT INTO experience_records (source_id,id,created_at,chat) VALUES (?,?,?,?)
+          ON CONFLICT(source_id,id) DO UPDATE SET chat=excluded.chat`).run(chat.sourceId, recordId, chat.createdAt, JSON.stringify(chat));
+      } else {
+        this.setMeta(`experience.chat.${chat.sourceId}`, chat);
+      }
+      this.setMeta(`experience.thread.${chat.threadId}`, recordId ? { sourceId: chat.sourceId, recordId } : chat.sourceId);
       this.registerBackgroundSession(chat.threadId, `experience:${chat.sourceId}`);
     });
   }
+  /** 写入本次任务的最新断点；同一记录的重试保留初次发起时间和已关联的聊天。 */
+  saveExperiencePreparation(job) {
+    if (!job.recordId) return this.setMeta(`experience.preparation.${job.sourceId}`, job);
+    this.db.prepare(`INSERT INTO experience_records (source_id,id,created_at,preparation) VALUES (?,?,?,?)
+      ON CONFLICT(source_id,id) DO UPDATE SET preparation=excluded.preparation`).run(job.sourceId, job.recordId, job.createdAt, JSON.stringify(job));
+    return job;
+  }
+  /** 合并旧版按来源分开的聊天和任务；同源旧记录始终以来源 ID 标识。 */
+  legacyExperienceRecords(sourceId) {
+    const rows = sourceId ? this.db.prepare("SELECT key,body FROM meta WHERE key IN (?,?)").all(`experience.chat.${sourceId}`, `experience.preparation.${sourceId}`) : this.db.prepare("SELECT key,body FROM meta WHERE key GLOB 'experience.chat.*' OR key GLOB 'experience.preparation.*'").all();
+    const records = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      const data = JSON.parse(row.body);
+      const record2 = records.get(data.sourceId) ?? { id: data.sourceId, sourceId: data.sourceId, createdAt: data.createdAt, legacy: true };
+      record2.createdAt = record2.createdAt < data.createdAt ? record2.createdAt : data.createdAt;
+      if (row.key.startsWith("experience.chat.")) record2.chat = data;
+      else record2.preparation = data;
+      records.set(record2.id, record2);
+    }
+    return [...records.values()];
+  }
+  /** 从新到旧读取可恢复的原始记录；可限定为单个来源。 */
+  experienceRecords(sourceId) {
+    const rows = sourceId ? this.db.prepare("SELECT * FROM experience_records WHERE source_id=? ORDER BY rowid DESC").all(sourceId) : this.db.prepare("SELECT * FROM experience_records ORDER BY rowid DESC").all();
+    const records = rows.map((row) => ({
+      id: row.id,
+      sourceId: row.source_id,
+      createdAt: row.created_at,
+      legacy: false,
+      ...row.chat ? { chat: JSON.parse(row.chat) } : {},
+      ...row.preparation ? { preparation: JSON.parse(row.preparation) } : {}
+    }));
+    return records.concat(this.legacyExperienceRecords(sourceId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  /** 按来源和记录精确取已注册聊天；未完成的准备断点只用于后台恢复。 */
+  experienceRecordChat(sourceId, recordId) {
+    const row = this.db.prepare("SELECT chat FROM experience_records WHERE source_id=? AND id=?").get(sourceId, recordId);
+    if (row) return row.chat ? JSON.parse(row.chat) : null;
+    return recordId === sourceId ? this.meta(`experience.chat.${sourceId}`, null) : null;
+  }
   /** 获取所有已准备的沉淀聊天，供宿主状态同步使用。 */
   experienceChats() {
-    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.chat.%'").all().map((row) => JSON.parse(row.body));
+    return this.experienceRecords().flatMap((record2) => record2.chat ?? []);
   }
-  /** 读取后台准备的持久化状态，供卡片投影及服务重启恢复使用。 */
+  /** 获取全部后台准备状态，包含旧版按来源保存的任务。 */
   experiencePreparations() {
-    return this.db.prepare("SELECT body FROM meta WHERE key LIKE 'experience.preparation.%'").all().map((row) => JSON.parse(row.body));
+    return this.experienceRecords().flatMap((record2) => record2.preparation ?? []);
   }
-  /** 查询沉淀会话的可信关联，不根据标题或路径猜测身份。 */
+  /** 查询沉淀会话的可信关联，兼容旧版字符串映射。 */
   experienceChatForThread(id2) {
-    const sourceId = this.meta(`experience.thread.${id2}`, null);
-    return sourceId ? this.meta(`experience.chat.${sourceId}`, null) : null;
+    const binding = this.meta(`experience.thread.${id2}`, null);
+    if (!binding) return null;
+    const chat = typeof binding === "string" ? this.experienceRecordChat(binding, binding) : this.experienceRecordChat(binding.sourceId, binding.recordId);
+    return chat?.threadId === id2 ? chat : null;
   }
   /** 查询沉淀聊天是否已有真实轮次；开始记录、可信轮次标识和已核实结果均可跨重启复用。 */
   experienceChatHasStarted(threadId) {
@@ -23826,23 +23904,35 @@ var Store = class {
     }
     this.db.prepare("INSERT OR REPLACE INTO sessions VALUES (?,?)").run(thread.id, JSON.stringify(observation));
   }
+  /** 按业务会话投影目录、宿主状态和各次沉淀进度。 */
   sessions() {
     const stored = this.db.prepare("SELECT body FROM sessions ORDER BY rowid DESC").all().map((r) => JSON.parse(r.body));
     const observations = new Map(stored.map((s) => [s.id, s]));
-    const chats = new Map(this.experienceChats().map((chat) => [chat.sourceId, chat]));
-    const preparations = new Map(this.experiencePreparations().map((job) => [job.sourceId, preparationView(job)]));
+    const recordsBySource = /* @__PURE__ */ new Map();
+    for (const { id: id2, sourceId, createdAt, chat, preparation } of this.experienceRecords()) {
+      const sourceCapturedAt = preparation?.sourceSnapshot?.sourceCapturedAt ?? chat?.sourceCapturedAt;
+      const records = recordsBySource.get(sourceId) ?? [];
+      records.push({
+        id: id2,
+        createdAt,
+        ...sourceCapturedAt ? { sourceCapturedAt } : {},
+        ...preparation?.focus ? { focus: preparation.focus } : {},
+        ...preparation ? { preparation: preparationView(preparation) } : {},
+        ...chat ? { experience: experienceProgress(chat, observations.get(chat.threadId) ?? null, readExperienceReport(chat, this.now()), this.now()) } : {}
+      });
+      recordsBySource.set(sourceId, records);
+    }
     return stored.filter((s) => !this.isBackgroundSession(s.id, s.cwd)).map((s) => {
       const state = runtimeState(s.observedState);
       const age = this.now() - Date.parse(s.observedAt);
       const extendedRunning = state === "running" && s.source === "codex-rollout" && s.event === "task_started";
       const pendingUser = ["waiting_approval", "waiting_input"].includes(state) && ["codex-hook", "codex-app-server", "codex-rollout"].includes(s.source) && Number.isFinite(age);
       const expired = ["queued", "running", "waiting_approval", "waiting_input"].includes(state) && !pendingUser && age > (extendedRunning ? 18e5 : 3e5);
-      const chat = chats.get(s.id);
+      const experienceRecords = recordsBySource.get(s.id) ?? [];
       const summary = this.meta(`session.summary.${s.id}`, null);
       const summaryStatus = this.meta(`session.summary-status.${s.id}`, "");
-      const experiencePreparation = preparations.get(s.id);
-      const experience = chat ? experienceProgress(chat, observations.get(chat.threadId) ?? null, readExperienceReport(chat, this.now()), this.now()) : void 0;
-      return { ...s, ...summary ? { summary } : {}, ...summaryStatus ? { summaryStatus } : {}, ...experiencePreparation ? { experiencePreparation } : {}, ...experience ? { experience } : {}, state: expired ? "unknown" : state, ...!expired && (extendedRunning || pendingUser) && age > 3e5 ? { stateConfidence: "last_observed" } : {} };
+      const { experience, preparation: experiencePreparation } = experienceRecords[0] ?? {};
+      return { ...s, experienceRecords, ...summary ? { summary } : {}, ...summaryStatus ? { summaryStatus } : {}, ...experiencePreparation ? { experiencePreparation } : {}, ...experience ? { experience } : {}, state: expired ? "unknown" : state, ...!expired && (extendedRunning || pendingUser) && age > 3e5 ? { stateConfidence: "last_observed" } : {} };
     });
   }
   snapshot() {
@@ -23938,7 +24028,7 @@ var Store = class {
     threads = threads.filter((thread) => !this.isBackgroundSession(thread.id, thread.cwd));
     return this.transaction(() => {
       const existing = new Map(this.sessions().map((session) => {
-        const { state, stateConfidence, experience, experiencePreparation, summary, summaryStatus, ...stored } = session;
+        const { state, stateConfidence, experience, experiencePreparation, experienceRecords, summary, summaryStatus, ...stored } = session;
         return [session.id, preserveConfirmation(stored)];
       }));
       const seen = /* @__PURE__ */ new Set();

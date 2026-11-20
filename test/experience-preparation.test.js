@@ -130,3 +130,165 @@ test('reusing an already started native conversation does not announce a fresh e
   assert.equal(result.status,'ready');assert.equal(result.unread,false);
   await manager.stop();
 });
+
+async function waitRecord(store, sourceId, recordId) {
+  for (let i = 0; i < 100; i++) {
+    const record = store.sessions().find(s => s.id === sourceId).experienceRecords?.find(r => r.id === recordId);
+    if (record && record.preparation?.status !== 'preparing') return record;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  assert.fail('指定沉淀记录未结束');
+}
+
+test('each accepted capture has its own notice, thread, focus and immutable source reference', async t => {
+  const { store, sourceId, chat, path } = fixture(t);
+  const firstId = randomUUID(), secondId = randomUUID();
+  let created = 0;
+  const manager = new ExperiencePreparations(store, async (_id, options) => {
+    created++;
+    if (options.recordId === secondId) assert.equal(options.previousSourcePath, chat.sourcePath);
+    return { ...chat, threadId: options.recordId, sourceCapturedAt: '2026-11-20T01:00:00.000Z' };
+  });
+  const first = manager.start(sourceId, undefined, { recordId: firstId, focus: '维护人' }).job;
+  assert.equal(manager.start(sourceId, undefined, { recordId: firstId }).job.id, first.id);
+  assert.throws(() => manager.start(sourceId, undefined, { recordId: secondId }), { status: 409 });
+  await waitRecord(store, sourceId, firstId);
+  manager.start(sourceId, undefined, { recordId: secondId });
+  await waitRecord(store, sourceId, secondId);
+  manager.acknowledge(sourceId, first.id);
+  assert.equal(manager.start(sourceId, undefined, { recordId: firstId }).job.id, first.id);
+  assert.equal(created, 2);
+
+  const reopened = new Store(path);
+  try {
+    const [source] = reopened.sessions();
+    assert.deepEqual(source.experienceRecords.map(r => [r.id, r.focus, r.experience.threadId, r.preparation.unread]), [
+      [secondId, undefined, secondId, true], [firstId, '维护人', firstId, false],
+    ]);
+    assert.equal(source.experienceRecords[1].sourceCapturedAt, '2026-11-20T01:00:00.000Z');
+    assert.equal(reopened.experienceChatForThread(firstId).threadId, firstId);
+    assert.equal(reopened.experienceRecordChat(sourceId, secondId).threadId, secondId);
+    assert.equal(reopened.experienceRecordChat(randomUUID(), secondId), null);
+    for (const threadId of [firstId, secondId]) reopened.observe({ session_id: threadId, hook_event_name: 'Stop', cwd: chat.vaultRoot });
+    assert.deepEqual(reopened.sessions().map(s => s.id), [sourceId]);
+  } finally { reopened.close(); }
+  await manager.stop();
+});
+
+test('a record retry retains the original snapshot, selection and focus after another capture', async t => {
+  const { store, sourceId, chat } = fixture(t);
+  const recordId = randomUUID(), anotherId = randomUUID();
+  const snapshot = { sourcePath: chat.sourcePath, sourceHash: 'original', sourceCapturedAt: store.at() };
+  const selected = { model: 'model-a', reasoningEffort: 'high' };
+  let attempts = 0;
+  const manager = new ExperiencePreparations(store, async (_id, options) => {
+    if (options.recordId === recordId && ++attempts === 1) {
+      options.onSourceSnapshot(snapshot);
+      options.onStage('connecting');
+      throw new Error('connection failed');
+    }
+    if (options.recordId === recordId) {
+      assert.deepEqual(options.sourceSnapshot, snapshot);
+      assert.deepEqual(options.modelSelection, selected);
+      assert.equal(options.focus, '工具用法');
+      assert.equal(options.previousSourcePath, undefined);
+    }
+    return { ...chat, threadId: options.recordId };
+  });
+  const failed = manager.start(sourceId, selected, { recordId, focus: '工具用法' }).job;
+  const record = await waitRecord(store, sourceId, recordId);
+  assert.equal(record.preparation.status, 'failed');
+  assert.equal(record.sourceCapturedAt, snapshot.sourceCapturedAt);
+  assert.equal(JSON.stringify(record).includes(snapshot.sourcePath), false);
+  assert.equal(manager.start(sourceId, undefined, { recordId }).job.id, failed.id);
+  manager.start(sourceId, undefined, { recordId: anotherId });
+  await waitRecord(store, sourceId, anotherId);
+  const retry = manager.retry(sourceId, recordId).job;
+  assert.notEqual(retry.id, failed.id);
+  assert.equal((await waitRecord(store, sourceId, recordId)).preparation.status, 'ready');
+  assert.equal(store.sessions()[0].experienceRecords[0].id, anotherId);
+  assert.equal(attempts, 2);
+  await manager.stop();
+});
+
+test('legacy preparation and chat appear as one stable record through retries and restart', async t => {
+  const { store, sourceId, chat, path } = fixture(t);
+  assert.deepEqual(store.sessions()[0].experienceRecords, []);
+  store.registerExperienceChat(chat);
+  const oldRecord = store.sessions()[0].experienceRecords[0];
+  assert.equal(oldRecord.experience.threadId, chat.threadId);
+  assert.equal(oldRecord.preparation, undefined);
+  const manager = new ExperiencePreparations(store, async (_id, options) => options.recordId ? { ...chat, threadId: options.recordId } : chat);
+  const oldJob = manager.start(sourceId).job;
+  await waitRecord(store, sourceId, oldRecord.id);
+  const nextId = randomUUID();
+  manager.start(sourceId, undefined, { recordId: nextId });
+  await waitRecord(store, sourceId, nextId);
+  const reopened = new Store(path);
+  try {
+    const restored = new ExperiencePreparations(reopened, async () => assert.fail('不得自动重发'));
+    assert.deepEqual(reopened.sessions()[0].experienceRecords.map(r => r.id), [nextId, oldRecord.id]);
+    assert.equal(reopened.experienceRecordChat(sourceId, oldRecord.id).threadId, chat.threadId);
+    restored.acknowledge(sourceId, oldJob.id);
+    assert.equal(reopened.sessions()[0].experienceRecords[1].preparation.unread, false);
+    assert.equal(restored.start(sourceId).job.id, reopened.sessions()[0].experienceRecords[0].preparation.id);
+    await restored.stop();
+  } finally { reopened.close(); }
+  await manager.stop();
+});
+
+test('a valid submission ID equal to the source ID works when there is no legacy record', async t => {
+  const { store, sourceId, chat } = fixture(t);
+  const manager = new ExperiencePreparations(store, async () => chat);
+  manager.start(sourceId, undefined, { recordId: sourceId });
+  await waitRecord(store, sourceId, sourceId);
+  assert.equal(store.experienceRecordChat(sourceId, sourceId).threadId, chat.threadId);
+  assert.equal(store.sessions()[0].experienceRecords.length, 1);
+  await manager.stop();
+});
+
+test('a thread or record binding cannot be reassigned to a different capture', async t => {
+  const { store, sourceId, chat } = fixture(t);
+  const firstId = randomUUID(), nextId = randomUUID();
+  store.registerExperienceChat(chat, firstId);
+  store.registerExperienceChat(chat, firstId);
+  assert.throws(() => store.registerExperienceChat(chat, nextId), /关联/);
+  assert.throws(() => store.registerExperienceChat({ ...chat, threadId: randomUUID() }, firstId), /关联/);
+  assert.equal(store.experienceRecordChat(sourceId, nextId), null);
+  assert.equal(store.experienceRecordChat(sourceId, firstId).threadId, chat.threadId);
+});
+
+test('retrying a legacy preparation without a stored model uses the saved capture model', async t => {
+  const { store, sourceId, chat } = fixture(t);
+  const selection = { model: 'saved-default', reasoningEffort: 'high' };
+  store.setMeta('experience.modelPreference', { revision: 1, selection });
+  store.setMeta(`experience.preparation.${sourceId}`, {
+    id: randomUUID(), sourceId, status: 'failed', stage: 'seeding', createdAt: store.at(), updatedAt: store.at(),
+    unread: false, retryAllowed: true, timings: {}, checkpoint: chat,
+  });
+  const manager = new ExperiencePreparations(store, async (_id, options) => options.resume, async (_chat, options) => {
+    assert.deepEqual(options.modelSelection, selection);
+  });
+  manager.retry(sourceId, sourceId);
+  const record = await waitRecord(store, sourceId, sourceId);
+  assert.equal(record.preparation.status, 'ready');
+  assert.deepEqual(record.preparation.modelSelection, selection);
+  await manager.stop();
+});
+
+test('restart restores an extracting legacy checkpoint without retrying its uncertain native turn', async t => {
+  const { store, sourceId, chat } = fixture(t);
+  // 旧数据只保留提取阶段的任务和已知线程断点。
+  store.setMeta(`experience.preparation.${sourceId}`, {
+    id: randomUUID(), sourceId, status: 'preparing', stage: 'extracting', createdAt: store.at(), updatedAt: store.at(),
+    unread: false, retryAllowed: true, timings: {}, checkpoint: chat,
+  });
+  store.setMeta(`experience.initial.${chat.threadId}`, { status: 'dispatching' });
+  const manager = new ExperiencePreparations(store, async () => assert.fail('不得重发'));
+  const [record] = store.sessions()[0].experienceRecords;
+  assert.equal(record.preparation.retryAllowed, false);
+  assert.equal(record.experience.threadId, chat.threadId);
+  assert.equal(store.experienceRecordChat(sourceId, record.id).threadId, chat.threadId);
+  assert.throws(() => manager.retry(sourceId, record.id), /核对/);
+  await manager.stop();
+});

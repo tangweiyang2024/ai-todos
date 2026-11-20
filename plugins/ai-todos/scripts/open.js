@@ -2351,6 +2351,17 @@ var loadLanguages = instance.loadLanguages;
 
 // src/locales/en.ts
 var en_default = {
+  "wiki.newCapture": "Start a new capture",
+  "wiki.captureHistoryCount": "View capture history ({{count}})",
+  "wiki.captureHistory": "Capture history",
+  "wiki.captureFocus": "Focus for this capture (optional)",
+  "wiki.captureFocusHint": "For example, capture the conditions the maintainer clarified later.",
+  "wiki.captureScope": "Scope: full conversation available at capture time",
+  "wiki.captureScopeAt": "Scope: full conversation as of {{at}}",
+  "wiki.captureScopeUnknown": "Scope: snapshot time unavailable",
+  "wiki.captureStartedAt": "Started {{at}}",
+  "wiki.captureRecord": "Capture details",
+  "wiki.captureSourceLink": "Open source conversation",
   "wiki.reviewCapture": "Review extraction result",
   "wiki.captureInspect": "Inspect conversation",
   "wiki.captureChooseDefault": "Choose and save a default capture model, then return to the card to start.",
@@ -3153,6 +3164,17 @@ var en_default = {
 
 // src/locales/zh-CN.ts
 var zh_CN_default = {
+  "wiki.newCapture": "\u53D1\u8D77\u65B0\u6C89\u6DC0",
+  "wiki.captureHistoryCount": "\u67E5\u770B\u6C89\u6DC0\u8BB0\u5F55\uFF08{{count}}\uFF09",
+  "wiki.captureHistory": "\u6C89\u6DC0\u8BB0\u5F55",
+  "wiki.captureFocus": "\u672C\u6B21\u91CD\u70B9\uFF08\u9009\u586B\uFF09",
+  "wiki.captureFocusHint": "\u4F8B\u5982\uFF1A\u8865\u5145\u7EF4\u62A4\u4EBA\u540E\u6765\u786E\u8BA4\u7684\u751F\u6548\u6761\u4EF6",
+  "wiki.captureScope": "\u63D0\u53D6\u8303\u56F4\uFF1A\u53D1\u8D77\u65F6\u53EF\u8BFB\u53D6\u7684\u4F1A\u8BDD\u5168\u6587",
+  "wiki.captureScopeAt": "\u63D0\u53D6\u8303\u56F4\uFF1A\u622A\u81F3 {{at}} \u7684\u4F1A\u8BDD\u5168\u6587",
+  "wiki.captureScopeUnknown": "\u63D0\u53D6\u8303\u56F4\uFF1A\u5FEB\u7167\u65F6\u95F4\u672A\u8BB0\u5F55",
+  "wiki.captureStartedAt": "\u53D1\u8D77\u4E8E {{at}}",
+  "wiki.captureRecord": "\u6C89\u6DC0\u8BB0\u5F55\u8BE6\u60C5",
+  "wiki.captureSourceLink": "\u6253\u5F00\u6765\u6E90\u4F1A\u8BDD",
   "wiki.reviewCapture": "\u67E5\u770B\u63D0\u53D6\u7ED3\u679C",
   "wiki.captureInspect": "\u8FDB\u5165\u4F1A\u8BDD\u6838\u5BF9",
   "wiki.captureChooseDefault": "\u8BF7\u5148\u9009\u62E9\u5E76\u4FDD\u5B58\u6C89\u6DC0\u9ED8\u8BA4\u6A21\u578B\uFF0C\u7136\u540E\u8FD4\u56DE\u5361\u7247\u5F00\u59CB\u63D0\u53D6\u3002",
@@ -3960,7 +3982,7 @@ async function connect() {
       const health = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(600) }).then((response2) => response2.json());
       const comparison = typeof health.version === "string" ? package_default.version.localeCompare(health.version, void 0, { numeric: true }) : -1;
       const revision = typeof capabilities.wikiUiRevision === "number" ? capabilities.wikiUiRevision : 0;
-      if (health.name === "ai-todos" && (comparison > 0 || comparison === 0 && revision < 9)) {
+      if (health.name === "ai-todos" && (comparison > 0 || comparison === 0 && revision < 10)) {
         const stopped = await fetch(`${origin}/internal/stop`, { method: "POST", headers: { authorization: `Bearer ${candidate.token}` }, signal: AbortSignal.timeout(1e3) });
         if (!stopped.ok) throw new Error("\u65E7\u670D\u52A1\u505C\u6B62\u5931\u8D25");
         return false;

@@ -19,7 +19,15 @@ export interface Session {
   codexProjectId?: string | null; catalogCreatedAt?: string; archiveConfirmed?: boolean; catalogUpdatedAt?: string; catalogVisible?: boolean; confirmedAt?: string; confirmationHistory?: SessionConfirmation[]; activityHistory?: SessionActivity[];
 }
 export interface SessionSummary { format?: 'goal'; text: string; sourceUpdatedAt: string; partial: boolean }
-export type LiveSession = Session & { summary?: SessionSummary; summaryStatus?: string; state: string; stateConfidence?: 'last_observed'; mode?: 'planning' | 'execution'; experience?: ExperienceProgress; experiencePreparation?: ExperiencePreparationView };
+export interface ExperienceRecordView {
+  id: string;
+  createdAt: string;
+  focus?: string;
+  sourceCapturedAt?: string;
+  preparation?: ExperiencePreparationView;
+  experience?: ExperienceProgress;
+}
+export type LiveSession = Session & { summary?: SessionSummary; summaryStatus?: string; state: string; stateConfidence?: 'last_observed'; mode?: 'planning' | 'execution'; experience?: ExperienceProgress; experiencePreparation?: ExperiencePreparationView; experienceRecords?: ExperienceRecordView[] };
 export type Task = EntityData<'task'> & EntityMeta & {
   state: TaskState; sessionId: string | null; ai?: LiveSession | null; delivery?: Delivery; review?: Review;
   capture?: { id: string; title: string; capturedAt: string };
